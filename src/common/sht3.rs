@@ -20,10 +20,10 @@ pub struct Measurement {
 
 const COM_WAKEUP: [u8; 2] = [0x35, 0x17];
 const COM_ID : [u8; 2] = [0xEF, 0xC8];
-const COM_RESET : [u8; 2] = [0x80, 0x5D];
+// const COM_RESET : [u8; 2] = [0x80, 0x5D];
 const COM_SLEEP : [u8; 2] = [0xB0, 0x98];
 const COM_MEAS_TH : [u8; 2] = [0x78, 0x66];
-const COM_MEAS_TH_LP : [u8; 2] = [0x60, 0x9C];
+// const COM_MEAS_TH_LP : [u8; 2] = [0x60, 0x9C];
 
 impl<'a, I2C, DELAY, E> SHT3<'a, I2C, DELAY> where 
 I2C: i2c::Write<Error = E> + i2c::Read<Error = E>,

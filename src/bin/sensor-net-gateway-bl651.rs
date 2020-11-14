@@ -16,8 +16,9 @@ use nrf52810_hal::prelude::OutputPin;
 use core::fmt::Write;
 use core::format_args;
 use rtic::app;
-// mod sht3;
+// use common::sht3;
 use common::radio;
+// use embedded_hal::blocking::{i2c as i2c, delay as delay};
 
 #[app(device = nrf52810_pac, peripherals = true)]
 const APP: () = {
@@ -25,8 +26,8 @@ const APP: () = {
         uart: hal::uarte::Uarte<nrf52810_hal::pac::UARTE0>,
         radio: radio::Radio,
         delay: hal::delay::Delay,
-        rtc: hal::rtc::Rtc<nrf52810_pac::RTC0, hal::rtc::Started>
-        // clock: clock::Clock
+        rtc: hal::rtc::Rtc<nrf52810_pac::RTC0, hal::rtc::Started>,
+        i2c: hal::twim::Twim<nrf52810_pac::TWIM0>
     }
 
     #[init]
@@ -43,8 +44,17 @@ const APP: () = {
             rts: None
         };
         let uart = hal::uarte::Uarte::new(device.UARTE0, pins, hal::uarte::Parity::EXCLUDED, hal::uarte::Baudrate::BAUD1M);
-
-        // rtic::pend(nrf52810_pac::Interrupt::RADIO);
+        
+        let mut delay = hal::delay::Delay::new(core.SYST);
+        
+        let i2c_pins = hal::twim::Pins {
+            sda: port0.p0_15.into_floating_input().degrade(),
+            scl: port0.p0_13.into_floating_input().degrade(),
+        };
+        let mut i2c = hal::twim::Twim::new(device.TWIM0, i2c_pins, hal::twim::Frequency::K400);
+        
+        // set up SHT3
+        common::sht3::SHT3::new(&mut i2c, &mut delay).init().unwrap();
 
         // set up clocks
         hal::clocks::Clocks::new(device.CLOCK)
@@ -65,21 +75,22 @@ const APP: () = {
         radio.init_reception();
         radio.start_reception();
 
-        let delay = hal::delay::Delay::new(core.SYST);
-
         init::LateResources {
             uart: uart,
             radio: radio,
             delay: delay,
-            rtc: rtc
+            rtc: rtc,
+            i2c: i2c
         }
     }
 
-    #[task(binds = RTC0, resources = [uart, rtc])]
+    #[task(binds = RTC0, resources = [uart, rtc, i2c, delay])]
     fn rtc_handler(ctx: rtc_handler::Context) {
         ctx.resources.rtc.get_event_triggered(hal::rtc::RtcInterrupt::Compare0, true);
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
-        ctx.resources.uart.write_fmt(format_args!("tick tock\n")).unwrap();
+        let mut sht3 = common::sht3::SHT3::new(ctx.resources.i2c, ctx.resources.delay);
+        let meas = sht3.get_measurement().unwrap();
+        ctx.resources.uart.write_fmt(format_args!("{{\"\temperature\": {}, \"humidity\": {}}}\n", meas.temperature, meas.humidity)).unwrap();
         ctx.resources.rtc.clear_counter();
         // ctx.resources.rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
     }
