@@ -1,0 +1,37 @@
+{
+    /* 
+     * Requires the Rust Language Server (RLS)
+     * https://marketplace.visualstudio.com/items?itemName=rust-lang.rust
+     */
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Gateway",
+            "type": "gdb",
+            "request": "launch",
+            "gdbpath": "gdb",
+            "target": "target/thumbv7em-none-eabi/debug/sensor-net-gateway-bl651",
+            "cwd": "${workspaceRoot}",
+            "autorun": [
+                "target remote | ssh hc2 \"sudo openocd -c 'gdb_port pipe; log_output /dev/null; source [find interface/raspberrypi-native.cfg]; transport select swd; source [find target/nrf52.cfg]; bcm2835gpio_swd_nums 23 24; bcm2835gpio_trst_num 18; init'\"",
+                "monitor reset halt",
+                "load"
+            ],
+            "preLaunchTask": "pre-launch"
+        },
+        {
+            "name": "Debug Personal-Beacon",
+            "type": "gdb",
+            "request": "launch",
+            "gdbpath": "gdb",
+            "target": "target/thumbv7em-none-eabi/debug/personal-beacon",
+            "cwd": "${workspaceRoot}",
+            "autorun": [
+                "target remote | ssh hc2 \"sudo openocd -c 'gdb_port pipe; log_output /dev/null; source [find interface/raspberrypi-native.cfg]; transport select swd; source [find target/nrf52.cfg]; bcm2835gpio_swd_nums 9 11; bcm2835gpio_trst_num 10; init'\"",
+                "monitor reset halt",
+                "load"
+            ],
+            "preLaunchTask": "pre-launch"
+        }
+    ]
+}
