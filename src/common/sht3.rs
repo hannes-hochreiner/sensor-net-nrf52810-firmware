@@ -14,8 +14,8 @@ pub struct SHT3<'a, I2C, DELAY> {
 }
 
 pub struct Measurement {
-    temperature: f32,
-    humidity: f32
+    pub temperature: f32,
+    pub humidity: f32
 }
 
 const COM_WAKEUP: [u8; 2] = [0x35, 0x17];
@@ -78,9 +78,9 @@ E: core::fmt::Debug {
         let poly = 0x31;
 
         for byte in buffer {
-            rem = rem ^ byte;
+            rem ^= byte;
 
-            for _i in 1..8 {
+            for _i in 1..9 {
                 if rem & 0x80 == 0x80 {
                     rem = (rem << 1) ^ poly;
                 } else {
