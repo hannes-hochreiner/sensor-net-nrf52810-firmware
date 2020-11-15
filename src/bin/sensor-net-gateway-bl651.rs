@@ -27,7 +27,9 @@ const APP: () = {
         radio: radio::Radio,
         delay: hal::delay::Delay,
         rtc: hal::rtc::Rtc<nrf52810_pac::RTC0, hal::rtc::Started>,
-        i2c: hal::twim::Twim<nrf52810_pac::TWIM0>
+        i2c: hal::twim::Twim<nrf52810_pac::TWIM0>,
+        device_id: u64,
+        part_id: u32
     }
 
     #[init]
@@ -75,22 +77,28 @@ const APP: () = {
         radio.init_reception();
         radio.start_reception();
 
+        // get device id
+        let device_id = ((device.FICR.deviceid[1].read().bits() as u64) << 32) + (device.FICR.deviceid[0].read().bits() as u64);
+        let part_id = device.FICR.info.part.read().bits();
+
         init::LateResources {
             uart: uart,
             radio: radio,
             delay: delay,
             rtc: rtc,
-            i2c: i2c
+            i2c: i2c,
+            device_id: device_id,
+            part_id: part_id
         }
     }
 
-    #[task(binds = RTC0, resources = [uart, rtc, i2c, delay])]
+    #[task(binds = RTC0, resources = [uart, rtc, i2c, delay, device_id, part_id])]
     fn rtc_handler(ctx: rtc_handler::Context) {
         ctx.resources.rtc.get_event_triggered(hal::rtc::RtcInterrupt::Compare0, true);
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         let mut sht3 = common::sht3::SHT3::new(ctx.resources.i2c, ctx.resources.delay);
         let meas = sht3.get_measurement().unwrap();
-        ctx.resources.uart.write_fmt(format_args!("{{\"\temperature\": {}, \"humidity\": {}}}\n", meas.temperature, meas.humidity)).unwrap();
+        ctx.resources.uart.write_fmt(format_args!("{{\"id\": \"{:0>8x}-{:0>16x}\",\"temperature\": {}, \"humidity\": {}}}\n", ctx.resources.part_id, ctx.resources.device_id, meas.temperature, meas.humidity)).unwrap();
         ctx.resources.rtc.clear_counter();
         // ctx.resources.rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
     }
