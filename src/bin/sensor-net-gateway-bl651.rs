@@ -40,8 +40,8 @@ const APP: () = {
         let pins = hal::uarte::Pins {
             rxd: port0.p0_08.into_floating_input().degrade(),
             txd: port0.p0_06.into_push_pull_output(Level::Low).degrade(),
-            cts: None,
-            rts: None
+            cts: Some(port0.p0_07.into_floating_input().degrade()),
+            rts: Some(port0.p0_05.into_push_pull_output(Level::Low).degrade())
         };
         let uart = hal::uarte::Uarte::new(device.UARTE0, pins, hal::uarte::Parity::EXCLUDED, hal::uarte::Baudrate::BAUD1M);
         
