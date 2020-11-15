@@ -33,7 +33,7 @@ E: core::fmt::Debug {
         SHT3 {i2c: i2c, delay: delay, address: 0x70}
     }
 
-    pub fn init(&mut self) -> Result<(), Sht3Error<E>> {
+    pub fn init(&mut self) -> Result<u16, Sht3Error<E>> {
         self.i2c.write(self.address, &COM_WAKEUP).map_err(Sht3Error::EmbeddedError).unwrap();
         self.delay.delay_ms(1);
         self.i2c.write(self.address, &COM_ID).map_err(Sht3Error::EmbeddedError).unwrap();
@@ -49,7 +49,7 @@ E: core::fmt::Debug {
             return Err(Sht3Error::CrcError);
         }
 
-        Ok(())
+        Ok(u16::from_le_bytes([buf_id[0], buf_id[1]]))
     }
 
     pub fn get_measurement(&mut self) -> Result<Measurement, Sht3Error<E>> {

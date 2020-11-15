@@ -29,7 +29,10 @@ const APP: () = {
         rtc: hal::rtc::Rtc<nrf52810_pac::RTC0, hal::rtc::Started>,
         i2c: hal::twim::Twim<nrf52810_pac::TWIM0>,
         device_id: u64,
-        part_id: u32
+        part_id: u32,
+        sensor_id: u16,
+        #[init(0)]
+        index: u32
     }
 
     #[init]
@@ -56,7 +59,7 @@ const APP: () = {
         let mut i2c = hal::twim::Twim::new(device.TWIM0, i2c_pins, hal::twim::Frequency::K400);
         
         // set up SHT3
-        common::sht3::SHT3::new(&mut i2c, &mut delay).init().unwrap();
+        let sensor_id = common::sht3::SHT3::new(&mut i2c, &mut delay).init().unwrap();
 
         // set up clocks
         hal::clocks::Clocks::new(device.CLOCK)
@@ -88,17 +91,19 @@ const APP: () = {
             rtc: rtc,
             i2c: i2c,
             device_id: device_id,
-            part_id: part_id
+            part_id: part_id,
+            sensor_id: sensor_id
         }
     }
 
-    #[task(binds = RTC0, resources = [uart, rtc, i2c, delay, device_id, part_id])]
+    #[task(binds = RTC0, resources = [uart, rtc, i2c, delay, device_id, part_id, sensor_id, index])]
     fn rtc_handler(ctx: rtc_handler::Context) {
         ctx.resources.rtc.get_event_triggered(hal::rtc::RtcInterrupt::Compare0, true);
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         let mut sht3 = common::sht3::SHT3::new(ctx.resources.i2c, ctx.resources.delay);
         let meas = sht3.get_measurement().unwrap();
-        ctx.resources.uart.write_fmt(format_args!("{{\"id\": \"{:0>8x}-{:0>16x}\",\"temperature\": {}, \"humidity\": {}}}\n", ctx.resources.part_id, ctx.resources.device_id, meas.temperature, meas.humidity)).unwrap();
+        ctx.resources.uart.write_fmt(format_args!("{{\"mcuId\": \"{:0>8x}-{:0>16x}\", \"index\": {}, \"sensorId\": \"{:0>4x}\", \"temperature\": {}, \"humidity\": {}}}\n", ctx.resources.part_id, ctx.resources.device_id, ctx.resources.index, ctx.resources.sensor_id, meas.temperature, meas.humidity)).unwrap();
+        *ctx.resources.index += 1;
         ctx.resources.rtc.clear_counter();
         // ctx.resources.rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
     }
