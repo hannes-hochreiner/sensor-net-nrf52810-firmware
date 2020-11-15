@@ -13,15 +13,17 @@ use nrf52810_hal as hal;
 // use nrf52810_hal::prelude::_embedded_hal_blocking_delay_DelayMs;
 // use lsm303agr::{AccelOutputDataRate, Lsm303agr};
 use rtic::app;
-use nrf52810_pac::generic::Variant::Val;
-// mod sht3;
 use common::radio;
 
 #[app(device = nrf52810_pac, peripherals = true)]
 const APP: () = {
     struct Resources {
         radio: common::radio::Radio,
-        rtc: hal::rtc::Rtc<nrf52810_pac::RTC0, hal::rtc::Started>
+        rtc: hal::rtc::Rtc<nrf52810_pac::RTC0, hal::rtc::Started>,
+        device_id: u64,
+        part_id: u32,
+        #[init(0)]
+        index: u32
     }
 
     #[init]
@@ -42,6 +44,10 @@ const APP: () = {
         rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         let rtc = rtc.enable_counter();
 
+        // get device id
+        let device_id = ((device.FICR.deviceid[1].read().bits() as u64) << 32) + (device.FICR.deviceid[0].read().bits() as u64);
+        let part_id = device.FICR.info.part.read().bits();
+        
         // rtic::pend(nrf52810_pac::Interrupt::POWER_CLOCK);
 
         let radio = radio::Radio::new(device.RADIO);
@@ -49,15 +55,45 @@ const APP: () = {
 
         init::LateResources {
             radio: radio,
-            rtc: rtc
+            rtc: rtc,
+            device_id: device_id,
+            part_id: part_id
         }
     }
 
-    #[task(binds = RTC0, resources = [radio, rtc])]
+    #[task(binds = RTC0, resources = [radio, rtc, device_id, part_id, index])]
     fn rtc_handler(ctx: rtc_handler::Context) {
         ctx.resources.rtc.get_event_triggered(hal::rtc::RtcInterrupt::Compare0, true);
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
-        ctx.resources.radio.start_transmission();
+
+        let sensor_id: u16 = 0xABCD;
+        let acc_x: f32 = 3.15;
+        let acc_y: f32 = 3.15;
+        let acc_z: f32 = 3.15;
+        let mag_x: f32 = 3.15;
+        let mag_y: f32 = 3.15;
+        let mag_z: f32 = 3.15;
+
+        // payload: type (u8) | device_id (u64) | part_id (u32) | index (u32) | sensor_id (u16) | acc_x (f32) | acc_y (f32) | acc_z (f32) | mag_x (f32) | mag_y (f32) | mag_z (f32)
+        // size (u8) + 43 bytes = 44 bytes
+        
+        let data: &[&[u8]] = &[
+            &[3u8], 
+            &ctx.resources.device_id.to_le_bytes(),
+            &ctx.resources.part_id.to_le_bytes(),
+            &ctx.resources.index.to_le_bytes(),
+            &sensor_id.to_le_bytes(),
+            &acc_x.to_le_bytes(),
+            &acc_y.to_le_bytes(),
+            &acc_z.to_le_bytes(),
+            &mag_x.to_le_bytes(),
+            &mag_y.to_le_bytes(),
+            &mag_z.to_le_bytes(),
+        ];
+
+        *ctx.resources.index += 1;
+
+        ctx.resources.radio.start_transmission(data);
         ctx.resources.rtc.clear_counter();
         // ctx.resources.rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
     }
@@ -66,45 +102,20 @@ const APP: () = {
     fn radio_handler(ctx: radio_handler::Context) {
         let radio = ctx.resources.radio;
 
-        // ctx.resources.uart.write_fmt(format_args!("radio handler called\n")).unwrap();
-
         radio.clear_all();
 
-        let _event_ready = radio.event_ready();
-        let _event_address = radio.event_address();
-        let _event_payload = radio.event_payload();
-        let _event_end = radio.event_end();
+        // let _event_ready = radio.event_ready();
+        // let _event_address = radio.event_address();
+        // let _event_payload = radio.event_payload();
+        // let _event_end = radio.event_end();
         let _event_disabled = radio.event_disabled();
-        let _event_devmatch = radio.event_devmatch();
-        let _event_devmiss = radio.event_devmiss();
-        let _event_rssiend = radio.event_rssiend();
-        let _event_bcmatch = radio.event_bcmatch();
-        let _event_crcok = radio.event_crcok();
-        let _event_crcerror = radio.event_crcerror();
+        // let _event_devmatch = radio.event_devmatch();
+        // let _event_devmiss = radio.event_devmiss();
+        // let _event_rssiend = radio.event_rssiend();
+        // let _event_bcmatch = radio.event_bcmatch();
+        // let _event_crcok = radio.event_crcok();
+        // let _event_crcerror = radio.event_crcerror();
         
         radio.event_reset_all();
-
-        match radio.state() {
-            Val(nrf52810_pac::radio::state::STATE_A::DISABLED) => {
-                // ctx.resources.uart.write_fmt(format_args!("DISABLED\n")).unwrap();
-
-                // radio.init_transmission();
-                // radio.start_transmission();
-            },
-            Val(nrf52810_pac::radio::state::STATE_A::TX) => {
-            },
-            Val(nrf52810_pac::radio::state::STATE_A::RX) => {
-
-                if radio.is_ready() {
-                    radio.clear_ready();
-                } else if radio.is_address() {
-                    radio.clear_address();
-                } else if radio.is_payload() {
-                    radio.clear_payload();
-                }
-            },
-            _ => {
-            }
-        }
     }
 };

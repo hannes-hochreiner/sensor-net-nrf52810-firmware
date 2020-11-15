@@ -81,7 +81,20 @@ impl Radio {
         });
     }
 
-    pub fn start_transmission(&self) {
+    pub fn start_transmission(&mut self, data: &[&[u8]]) {
+        // copy data into buffer
+        let mut len = 0;
+
+        for part in data {
+            for byte in *part {
+                self.packet[len + 1] = *byte;
+                len += 1;
+            }
+        }
+
+        self.packet[0] = (len + 1) as u8;
+        // for (a, b) in self.packet[0..data.len()].iter_mut().zip(data.iter()) { *a = *b; }
+
         // enable "disabled" interrupt
         self.radio.intenset.write(|w| { 
             w.disabled().bit(true)
