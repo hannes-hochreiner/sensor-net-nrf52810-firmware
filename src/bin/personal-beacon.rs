@@ -23,7 +23,8 @@ const APP: () = {
         device_id: u64,
         part_id: u32,
         #[init(0)]
-        index: u32
+        index: u32,
+        i2c: hal::twim::Twim<nrf52810_pac::TWIM0>,
     }
 
     #[init]
@@ -47,9 +48,17 @@ const APP: () = {
         // get device id
         let device_id = ((device.FICR.deviceid[1].read().bits() as u64) << 32) + (device.FICR.deviceid[0].read().bits() as u64);
         let part_id = device.FICR.info.part.read().bits();
-        
-        // rtic::pend(nrf52810_pac::Interrupt::POWER_CLOCK);
 
+        // set up sensor
+        let port0 = hal::gpio::p0::Parts::new(device.P0);
+        let i2c_pins = hal::twim::Pins {
+            sda: port0.p0_26.into_floating_input().degrade(),
+            scl: port0.p0_27.into_floating_input().degrade(),
+        };
+        let mut i2c = hal::twim::Twim::new(device.TWIM0, i2c_pins, hal::twim::Frequency::K400);
+        common::lsm303agr::LSM303AGR::new(&mut i2c).init().unwrap();
+
+        // set up radio
         let radio = radio::Radio::new(device.RADIO);
         radio.init_transmission();
 
@@ -57,22 +66,19 @@ const APP: () = {
             radio: radio,
             rtc: rtc,
             device_id: device_id,
-            part_id: part_id
+            part_id: part_id,
+            i2c: i2c
         }
     }
 
-    #[task(binds = RTC0, resources = [radio, rtc, device_id, part_id, index])]
+    #[task(binds = RTC0, resources = [radio, rtc, device_id, part_id, index, i2c])]
     fn rtc_handler(ctx: rtc_handler::Context) {
         ctx.resources.rtc.get_event_triggered(hal::rtc::RtcInterrupt::Compare0, true);
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
 
+        let mut sensor = common::lsm303agr::LSM303AGR::new(ctx.resources.i2c);
+        let meas = sensor.get_measurement().unwrap();
         let sensor_id: u16 = 0xABCD;
-        let acc_x: f32 = 3.15;
-        let acc_y: f32 = 3.15;
-        let acc_z: f32 = 3.15;
-        let mag_x: f32 = 3.15;
-        let mag_y: f32 = 3.15;
-        let mag_z: f32 = 3.15;
 
         // payload: type (u8) | device_id (u64) | part_id (u32) | index (u32) | sensor_id (u16) | acc_x (f32) | acc_y (f32) | acc_z (f32) | mag_x (f32) | mag_y (f32) | mag_z (f32)
         // size (u8) + 43 bytes = 44 bytes
@@ -83,12 +89,12 @@ const APP: () = {
             &ctx.resources.part_id.to_le_bytes(),
             &ctx.resources.index.to_le_bytes(),
             &sensor_id.to_le_bytes(),
-            &acc_x.to_le_bytes(),
-            &acc_y.to_le_bytes(),
-            &acc_z.to_le_bytes(),
-            &mag_x.to_le_bytes(),
-            &mag_y.to_le_bytes(),
-            &mag_z.to_le_bytes(),
+            &meas.acc_x.to_le_bytes(),
+            &meas.acc_y.to_le_bytes(),
+            &meas.acc_z.to_le_bytes(),
+            &meas.mag_x.to_le_bytes(),
+            &meas.mag_y.to_le_bytes(),
+            &meas.mag_z.to_le_bytes(),
         ];
 
         *ctx.resources.index += 1;
