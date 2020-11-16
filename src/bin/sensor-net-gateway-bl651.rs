@@ -107,7 +107,7 @@ const APP: () = {
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         let mut sht3 = common::sht3::SHT3::new(ctx.resources.i2c, ctx.resources.delay);
         let meas = sht3.get_measurement().unwrap();
-        ctx.resources.uart.write_fmt(format_args!("{{\"mcuId\": \"{:0>8x}-{:0>16x}\", \"index\": {}, \"sensorId\": \"{:0>4x}\", \"temperature\": {}, \"humidity\": {}}}\n", ctx.resources.part_id, ctx.resources.device_id, ctx.resources.index, ctx.resources.sensor_id, meas.temperature, meas.humidity)).unwrap();
+        ctx.resources.uart.write_fmt(format_args!("{{\"type\":\"gateway-bl651-sensor\",\"message\":{{\"mcuId\":\"{:0>8x}-{:0>16x}\",\"index\":{},\"sensorId\":\"{:0>4x}\",\"temperature\":{},\"humidity\":{}}}}}\n", ctx.resources.part_id, ctx.resources.device_id, ctx.resources.index, ctx.resources.sensor_id, meas.temperature, meas.humidity)).unwrap();
         *ctx.resources.index += 1;
         ctx.resources.led_green.set_low().unwrap();
         ctx.resources.rtc.clear_counter();
@@ -118,39 +118,37 @@ const APP: () = {
     fn radio_handler(ctx: radio_handler::Context) {
         let radio = ctx.resources.radio;
 
-        // ctx.resources.uart.write_fmt(format_args!("radio handler called\n")).unwrap();
-
         radio.clear_all();
 
-        let _event_ready = radio.event_ready();
-        let _event_address = radio.event_address();
-        let _event_payload = radio.event_payload();
-        let _event_end = radio.event_end();
-        let _event_disabled = radio.event_disabled();
-        let _event_devmatch = radio.event_devmatch();
-        let _event_devmiss = radio.event_devmiss();
-        let _event_rssiend = radio.event_rssiend();
-        let _event_bcmatch = radio.event_bcmatch();
-        let _event_crcok = radio.event_crcok();
-        let _event_crcerror = radio.event_crcerror();
+        let event_address = radio.event_address();
+        let event_payload = radio.event_payload();
+        let event_end = radio.event_end();
+        let event_disabled = radio.event_disabled();
+        let event_rssiend = radio.event_rssiend();
+        let event_crcok = radio.event_crcok();
         
         radio.event_reset_all();
 
-        if !_event_ready {
-            // radio.init_reception();
-            // radio.start_reception();
-        } else {
-            ctx.resources.led_red.set_high().unwrap();
-            if _event_rssiend {
-                ctx.resources.uart.write_fmt(format_args!("RSSI: -{}dB\n", radio.rssi())).unwrap();
+        if event_address && event_payload && event_end && event_crcok && event_rssiend {
+            if let Some(data) = radio.payload() {
+                ctx.resources.led_red.set_high().unwrap();
+                ctx.resources.uart.write_fmt(format_args!("{{\
+                    \"type\": \"gateway-bl651-radio\",\
+                    \"rssi\": -{},\
+                    \"data\": \"", radio.rssi())).unwrap();
+
+                for byte in data {
+                    ctx.resources.uart.write_fmt(format_args!("{:0>4x}", byte)).unwrap();
+                }
+                
+                ctx.resources.uart.write_fmt(format_args!("\"}}\n")).unwrap();
+                // ctx.resources.uart.write_fmt(format_args!("payload: {:?}\n", radio.payload())).unwrap();
+                ctx.resources.led_red.set_low().unwrap();
             }
-            if _event_payload {
-                ctx.resources.uart.write_fmt(format_args!("payload: {:?}\n", radio.payload())).unwrap();
-            }   
-            if _event_disabled {
-                radio.start_reception();
-            }
-            ctx.resources.led_red.set_low().unwrap();
+        }
+
+        if event_disabled {
+            radio.start_reception();
         }
     }
 };
