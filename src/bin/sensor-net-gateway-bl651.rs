@@ -42,13 +42,15 @@ const APP: () = {
         let device: nrf52810_pac::Peripherals = cx.device;
         let core = cx.core;
         let port0 = hal::gpio::p0::Parts::new(device.P0);
-        let led_green = port0.p0_24.into_push_pull_output(Level::Low);
-        let led_red = port0.p0_23.into_push_pull_output(Level::Low);
+        let mut led_green = port0.p0_24.into_push_pull_output(Level::Low);
+        let mut led_red = port0.p0_23.into_push_pull_output(Level::Low);
         let pins = hal::uarte::Pins {
             rxd: port0.p0_08.into_floating_input().degrade(),
             txd: port0.p0_06.into_push_pull_output(Level::Low).degrade(),
-            cts: Some(port0.p0_07.into_floating_input().degrade()),
-            rts: Some(port0.p0_05.into_push_pull_output(Level::Low).degrade())
+            cts: None,
+            rts: None
+            // cts: Some(port0.p0_07.into_floating_input().degrade()),
+            // rts: Some(port0.p0_05.into_push_pull_output(Level::Low).degrade())
         };
         let uart = hal::uarte::Uarte::new(device.UARTE0, pins, hal::uarte::Parity::EXCLUDED, hal::uarte::Baudrate::BAUD1M);
         
@@ -60,6 +62,10 @@ const APP: () = {
         };
         let mut i2c = hal::twim::Twim::new(device.TWIM0, i2c_pins, hal::twim::Frequency::K400);
         
+        // set up LEDs
+        led_green.set_low().unwrap();
+        led_red.set_low().unwrap();
+
         // set up SHT3
         let sensor_id = common::sht3::SHT3::new(&mut i2c, &mut delay).init().unwrap();
 
