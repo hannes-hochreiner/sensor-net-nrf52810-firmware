@@ -10,8 +10,6 @@ use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch
 // use cortex_m::asm;
 // use cortex_m_rt::entry;
 use nrf52810_hal as hal;
-// use nrf52810_hal::prelude::_embedded_hal_blocking_delay_DelayMs;
-// use lsm303agr::{AccelOutputDataRate, Lsm303agr};
 use rtic::app;
 use common::radio;
 
@@ -79,10 +77,6 @@ const APP: () = {
         let mut sensor = common::lsm303agr::LSM303AGR::new(ctx.resources.i2c);
         let meas = sensor.get_measurement().unwrap();
         let sensor_id: u16 = 0xABCD;
-
-        // payload: type (u8) | device_id (u64) | part_id (u32) | index (u32) | sensor_id (u16) | acc_x (f32) | acc_y (f32) | acc_z (f32) | mag_x (f32) | mag_y (f32) | mag_z (f32)
-        // size (u8) + 43 bytes = 44 bytes
-        
         let data: &[&[u8]] = &[
             &[3u8], 
             &ctx.resources.device_id.to_le_bytes(),
