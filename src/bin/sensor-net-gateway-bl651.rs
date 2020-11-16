@@ -32,7 +32,9 @@ const APP: () = {
         part_id: u32,
         sensor_id: u16,
         #[init(0)]
-        index: u32
+        index: u32,
+        led_green: nrf52810_hal::gpio::p0::P0_24<nrf52810_hal::gpio::Output<nrf52810_hal::gpio::PushPull>>,
+        led_red: nrf52810_hal::gpio::p0::P0_23<nrf52810_hal::gpio::Output<nrf52810_hal::gpio::PushPull>>
     }
 
     #[init]
@@ -40,8 +42,8 @@ const APP: () = {
         let device: nrf52810_pac::Peripherals = cx.device;
         let core = cx.core;
         let port0 = hal::gpio::p0::Parts::new(device.P0);
-        let mut led_green = port0.p0_24.into_push_pull_output(Level::Low);
-        led_green.set_high().unwrap();
+        let led_green = port0.p0_24.into_push_pull_output(Level::Low);
+        let led_red = port0.p0_23.into_push_pull_output(Level::Low);
         let pins = hal::uarte::Pins {
             rxd: port0.p0_08.into_floating_input().degrade(),
             txd: port0.p0_06.into_push_pull_output(Level::Low).degrade(),
@@ -92,23 +94,27 @@ const APP: () = {
             i2c: i2c,
             device_id: device_id,
             part_id: part_id,
-            sensor_id: sensor_id
+            sensor_id: sensor_id,
+            led_green: led_green,
+            led_red: led_red
         }
     }
 
-    #[task(binds = RTC0, resources = [uart, rtc, i2c, delay, device_id, part_id, sensor_id, index])]
+    #[task(binds = RTC0, resources = [uart, rtc, i2c, delay, device_id, part_id, sensor_id, index, led_green])]
     fn rtc_handler(ctx: rtc_handler::Context) {
         ctx.resources.rtc.get_event_triggered(hal::rtc::RtcInterrupt::Compare0, true);
+        ctx.resources.led_green.set_high().unwrap();
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         let mut sht3 = common::sht3::SHT3::new(ctx.resources.i2c, ctx.resources.delay);
         let meas = sht3.get_measurement().unwrap();
         ctx.resources.uart.write_fmt(format_args!("{{\"mcuId\": \"{:0>8x}-{:0>16x}\", \"index\": {}, \"sensorId\": \"{:0>4x}\", \"temperature\": {}, \"humidity\": {}}}\n", ctx.resources.part_id, ctx.resources.device_id, ctx.resources.index, ctx.resources.sensor_id, meas.temperature, meas.humidity)).unwrap();
         *ctx.resources.index += 1;
+        ctx.resources.led_green.set_low().unwrap();
         ctx.resources.rtc.clear_counter();
         // ctx.resources.rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
     }
 
-    #[task(binds = RADIO, resources = [uart, radio, delay])]
+    #[task(binds = RADIO, resources = [uart, radio, led_red])]
     fn radio_handler(ctx: radio_handler::Context) {
         let radio = ctx.resources.radio;
 
@@ -134,6 +140,7 @@ const APP: () = {
             // radio.init_reception();
             // radio.start_reception();
         } else {
+            ctx.resources.led_red.set_high().unwrap();
             if _event_rssiend {
                 ctx.resources.uart.write_fmt(format_args!("RSSI: -{}dB\n", radio.rssi())).unwrap();
             }
@@ -143,6 +150,7 @@ const APP: () = {
             if _event_disabled {
                 radio.start_reception();
             }
+            ctx.resources.led_red.set_low().unwrap();
         }
     }
 };
