@@ -40,7 +40,7 @@ const APP: () = {
 
         // set up RTC
         let mut rtc = hal::rtc::Rtc::new(device.RTC0, 3276).unwrap();
-        rtc.set_compare(hal::rtc::RtcCompareReg::Compare0, 50).unwrap();
+        rtc.set_compare(hal::rtc::RtcCompareReg::Compare0, 600).unwrap();
         rtc.enable_event(hal::rtc::RtcInterrupt::Compare0);
         rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         rtc.enable_counter();
