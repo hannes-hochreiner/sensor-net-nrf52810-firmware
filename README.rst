@@ -60,3 +60,11 @@ All values are transmitted in little-endian.
 +----------------+----+-----------------------+
 |magnetic field z|i16 |arbitrary units        |
 +----------------+----+-----------------------+
+
+Energy Saving
+-------------
+
+  * Enabling the DC/DC converter halves the current requirement in some scenarios.
+  * Power radio off, when it is not in use (it is on after reset)
+  * Running from HFINT consumes about 10% less energy than running from HFXO
+  * Running RTC from LFXO saves about 30% in sleep as compared to using LFRC
