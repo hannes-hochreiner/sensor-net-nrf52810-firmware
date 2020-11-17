@@ -29,6 +29,9 @@ const APP: () = {
     fn init(cx: init::Context) -> init::LateResources {
         let device: nrf52810_pac::Peripherals = cx.device;
 
+        // enable DC/DC converter
+        device.POWER.dcdcen.write(|w| { w.dcdcen().enabled() });
+
         // set up clocks
         hal::clocks::Clocks::new(device.CLOCK)
             .set_lfclk_src_rc()
