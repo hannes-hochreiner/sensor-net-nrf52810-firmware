@@ -10,6 +10,14 @@ impl Radio {
         Radio {radio: radio, packet: [0; 258]}
     }
     
+    pub fn power_off(&self) {
+        self.radio.power.write(|w| { w.power().disabled() });
+    }
+
+    pub fn power_enabled(&self) -> bool {
+        self.radio.power.read().power().bit()
+    }
+
     pub fn init_transmission(&self) {
         // POWER
         // 1 (default)

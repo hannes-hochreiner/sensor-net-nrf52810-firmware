@@ -58,7 +58,7 @@ const APP: () = {
 
         // set up radio
         let radio = radio::Radio::new(device.RADIO);
-        radio.init_transmission();
+        radio.power_off();
 
         init::LateResources {
             radio: radio,
@@ -93,6 +93,7 @@ const APP: () = {
 
         *ctx.resources.index += 1;
 
+        ctx.resources.radio.init_transmission();
         ctx.resources.radio.start_transmission(data);
         ctx.resources.rtc.clear_counter();
         // ctx.resources.rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
@@ -101,21 +102,9 @@ const APP: () = {
     #[task(binds = RADIO, resources = [radio])]
     fn radio_handler(ctx: radio_handler::Context) {
         let radio = ctx.resources.radio;
-
-        radio.clear_all();
-
-        // let _event_ready = radio.event_ready();
-        // let _event_address = radio.event_address();
-        // let _event_payload = radio.event_payload();
-        // let _event_end = radio.event_end();
         let _event_disabled = radio.event_disabled();
-        // let _event_devmatch = radio.event_devmatch();
-        // let _event_devmiss = radio.event_devmiss();
-        // let _event_rssiend = radio.event_rssiend();
-        // let _event_bcmatch = radio.event_bcmatch();
-        // let _event_crcok = radio.event_crcok();
-        // let _event_crcerror = radio.event_crcerror();
-        
+
         radio.event_reset_all();
+        radio.power_off();
     }
 };
