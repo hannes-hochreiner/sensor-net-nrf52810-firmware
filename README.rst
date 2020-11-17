@@ -64,7 +64,7 @@ All values are transmitted in little-endian.
 Power Consumption
 .................
 
-+============+=========+=========+===========+
++------------+---------+---------+-----------+
 |phase       |duration |component|consumption|
 +============+=========+=========+===========+
 |sleep       |59,9895ms|MCU      | 0.0015mA  |
