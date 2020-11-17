@@ -26,7 +26,7 @@ const APP: () = {
         uart: hal::uarte::Uarte<nrf52810_hal::pac::UARTE0>,
         radio: radio::Radio,
         delay: hal::delay::Delay,
-        rtc: hal::rtc::Rtc<nrf52810_pac::RTC0, hal::rtc::Started>,
+        rtc: hal::rtc::Rtc<nrf52810_pac::RTC0>,
         i2c: hal::twim::Twim<nrf52810_pac::TWIM0>,
         device_id: u64,
         part_id: u32,
@@ -76,12 +76,11 @@ const APP: () = {
             .enable_ext_hfosc();
 
         // set up RTC
-        let mut rtc = hal::rtc::Rtc::new(device.RTC0);
-        rtc.set_prescaler(3276).unwrap(); // => 10Hz
+        let mut rtc = hal::rtc::Rtc::new(device.RTC0, 3276).unwrap();
         rtc.set_compare(hal::rtc::RtcCompareReg::Compare0, 50).unwrap();
         rtc.enable_event(hal::rtc::RtcInterrupt::Compare0);
         rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
-        let rtc = rtc.enable_counter();
+        rtc.enable_counter();
 
         // set up radio
         let radio = radio::Radio::new(device.RADIO);
@@ -108,7 +107,7 @@ const APP: () = {
 
     #[task(binds = RTC0, resources = [uart, rtc, i2c, delay, device_id, part_id, sensor_id, index, led_green])]
     fn rtc_handler(ctx: rtc_handler::Context) {
-        ctx.resources.rtc.get_event_triggered(hal::rtc::RtcInterrupt::Compare0, true);
+        ctx.resources.rtc.reset_event(hal::rtc::RtcInterrupt::Compare0);
         ctx.resources.led_green.set_high().unwrap();
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         let mut sht3 = common::sht3::SHT3::new(ctx.resources.i2c, ctx.resources.delay);

@@ -17,7 +17,7 @@ use common::radio;
 const APP: () = {
     struct Resources {
         radio: common::radio::Radio,
-        rtc: hal::rtc::Rtc<nrf52810_pac::RTC0, hal::rtc::Started>,
+        rtc: hal::rtc::Rtc<nrf52810_pac::RTC0>,
         device_id: u64,
         part_id: u32,
         #[init(0)]
@@ -39,12 +39,11 @@ const APP: () = {
             .enable_ext_hfosc();
 
         // set up RTC
-        let mut rtc = hal::rtc::Rtc::new(device.RTC0);
-        rtc.set_prescaler(3276).unwrap(); // => 10Hz
+        let mut rtc = hal::rtc::Rtc::new(device.RTC0, 3276).unwrap();
         rtc.set_compare(hal::rtc::RtcCompareReg::Compare0, 50).unwrap();
         rtc.enable_event(hal::rtc::RtcInterrupt::Compare0);
         rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
-        let rtc = rtc.enable_counter();
+        rtc.enable_counter();
 
         // get device id
         let device_id = ((device.FICR.deviceid[1].read().bits() as u64) << 32) + (device.FICR.deviceid[0].read().bits() as u64);
@@ -58,6 +57,7 @@ const APP: () = {
         };
         let mut i2c = hal::twim::Twim::new(device.TWIM0, i2c_pins, hal::twim::Frequency::K400);
         common::lsm303agr::LSM303AGR::new(&mut i2c).init().unwrap();
+        i2c.disable();
 
         // set up radio
         let radio = radio::Radio::new(device.RADIO);
@@ -74,11 +74,17 @@ const APP: () = {
 
     #[task(binds = RTC0, resources = [radio, rtc, device_id, part_id, index, i2c])]
     fn rtc_handler(ctx: rtc_handler::Context) {
-        ctx.resources.rtc.get_event_triggered(hal::rtc::RtcInterrupt::Compare0, true);
+        ctx.resources.rtc.reset_event(hal::rtc::RtcInterrupt::Compare0);
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
+
+        ctx.resources.i2c.enable();
 
         let mut sensor = common::lsm303agr::LSM303AGR::new(ctx.resources.i2c);
         let meas = sensor.get_measurement().unwrap();
+
+        core::mem::drop(sensor);
+        ctx.resources.i2c.disable();
+
         let sensor_id: u16 = 0xABCD;
         let data: &[&[u8]] = &[
             &[3u8], 
