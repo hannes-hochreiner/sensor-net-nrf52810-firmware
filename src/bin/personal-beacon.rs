@@ -85,9 +85,9 @@ const APP: () = {
         core::mem::drop(sensor);
         ctx.resources.i2c.disable();
 
-        let sensor_id: u16 = 0xABCD;
+        let sensor_id: u16 = 0xAB01;
         let data: &[&[u8]] = &[
-            &[3u8], 
+            &3u16.to_le_bytes(),
             &ctx.resources.device_id.to_le_bytes(),
             &ctx.resources.part_id.to_le_bytes(),
             &ctx.resources.index.to_le_bytes(),
