@@ -143,7 +143,7 @@ const APP: () = {
                     \"data\": \"", radio.rssi())).unwrap();
 
                 for byte in data {
-                    ctx.resources.uart.write_fmt(format_args!("{:0>4x}", byte)).unwrap();
+                    ctx.resources.uart.write_fmt(format_args!("{:0>2x}", byte)).unwrap();
                 }
                 
                 ctx.resources.uart.write_fmt(format_args!("\"}}\n")).unwrap();
