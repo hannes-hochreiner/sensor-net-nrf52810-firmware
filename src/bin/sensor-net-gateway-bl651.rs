@@ -76,8 +76,8 @@ const APP: () = {
             .enable_ext_hfosc();
 
         // set up RTC
-        let mut rtc = hal::rtc::Rtc::new(device.RTC0, 3276).unwrap();
-        rtc.set_compare(hal::rtc::RtcCompareReg::Compare0, 50).unwrap();
+        let mut rtc = hal::rtc::Rtc::new(device.RTC0, 3276).unwrap(); => 10Hz
+        rtc.set_compare(hal::rtc::RtcCompareReg::Compare0, 600).unwrap(); => 1 min
         rtc.enable_event(hal::rtc::RtcInterrupt::Compare0);
         rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         rtc.enable_counter();
