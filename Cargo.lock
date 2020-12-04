@@ -241,8 +241,9 @@ checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 
 [[package]]
 name = "nrf-hal-common"
-version = "0.11.1"
-source = "git+https://github.com/hannes-hochreiner/nrf-hal#6f8522f246e62df346dcfee99e7f1c2f9d263610"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "675eee40228591a1991eade1d4adc1a23fd7ff750b5c895ca068b9c2f0878b72"
 dependencies = [
  "cast",
  "cfg-if",
@@ -258,8 +259,9 @@ dependencies = [
 
 [[package]]
 name = "nrf52810-hal"
-version = "0.11.1"
-source = "git+https://github.com/hannes-hochreiner/nrf-hal#6f8522f246e62df346dcfee99e7f1c2f9d263610"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb82ea4a6804e7f071451842a5cbd10abe658645e055d447a8921d6fc08ddb48"
 dependencies = [
  "embedded-hal",
  "nrf-hal-common",
