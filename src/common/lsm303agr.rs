@@ -91,8 +91,6 @@ E: core::fmt::Debug {
         self.i2c.write(self.address_mag, &[CFG_REG_A_M]).map_err(Lsm303agrError::EmbeddedError).unwrap();
         self.i2c.read(self.address_mag, &mut _tmp).map_err(Lsm303agrError::EmbeddedError).unwrap();
 
-
-
         // poll mag measurement
         let timeout_mag_max = 100;
         let mut timeout_mag = 0;
@@ -157,12 +155,23 @@ E: core::fmt::Debug {
         }
 
         Ok(Measurement {
-            acc_x: i16::from_le_bytes([buffer_meas_acc[0], buffer_meas_acc[1]]),
-            acc_y: i16::from_le_bytes([buffer_meas_acc[2], buffer_meas_acc[3]]),
-            acc_z: i16::from_le_bytes([buffer_meas_acc[4], buffer_meas_acc[5]]),
+            acc_x: i16::from_le_bytes(self.sign_extend([buffer_meas_acc[0], buffer_meas_acc[1]])),
+            acc_y: i16::from_le_bytes(self.sign_extend([buffer_meas_acc[2], buffer_meas_acc[3]])),
+            acc_z: i16::from_le_bytes(self.sign_extend([buffer_meas_acc[4], buffer_meas_acc[5]])),
             mag_x: i16::from_le_bytes([buffer_meas_mag[0], buffer_meas_mag[1]]),
             mag_y: i16::from_le_bytes([buffer_meas_mag[2], buffer_meas_mag[3]]),
             mag_z: i16::from_le_bytes([buffer_meas_mag[4], buffer_meas_mag[5]]),
         })
+    }
+
+    /// Sign extend a 12-bit left aligned little endian two's complements number to 16-bit
+    fn sign_extend(&self, bytes: [u8; 2]) -> [u8; 2] {
+        let mut tmp = u16::from_le_bytes(bytes) >> 4;
+
+        if tmp & 0x0800 == 0x0800 {
+            tmp = tmp | 0xF000;
+        }
+
+        tmp.to_le_bytes()
     }
 }
