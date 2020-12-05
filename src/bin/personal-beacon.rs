@@ -12,6 +12,7 @@ use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch
 use nrf52810_hal as hal;
 use rtic::app;
 use common::radio;
+use common::power;
 
 #[app(device = nrf52810_pac, peripherals = true)]
 const APP: () = {
@@ -23,6 +24,7 @@ const APP: () = {
         #[init(0)]
         index: u32,
         i2c: hal::twim::Twim<nrf52810_pac::TWIM0>,
+        power: common::power::Power,
     }
 
     #[init]
@@ -63,12 +65,17 @@ const APP: () = {
         let radio = radio::Radio::new(device.RADIO);
         radio.power_off();
 
+        // set up power
+        let mut power = power::Power::new(device.POWER);
+        power.set_mode(power::Mode::LowPower);
+
         init::LateResources {
             radio: radio,
             rtc: rtc,
             device_id: device_id,
             part_id: part_id,
-            i2c: i2c
+            i2c: i2c,
+            power: power,
         }
     }
 
