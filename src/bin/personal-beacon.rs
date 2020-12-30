@@ -62,8 +62,8 @@ const APP: () = {
         i2c.disable();
 
         // set up radio
-        let radio = radio::Radio::new(device.RADIO);
-        radio.power_off();
+        let mut radio = radio::Radio::new(device.RADIO);
+        radio.set_enabled(false);
 
         // set up power
         let mut power = power::Power::new(device.POWER);
@@ -121,6 +121,6 @@ const APP: () = {
         let _event_disabled = radio.event_disabled();
 
         radio.event_reset_all();
-        radio.power_off();
+        radio.set_enabled(false);
     }
 };

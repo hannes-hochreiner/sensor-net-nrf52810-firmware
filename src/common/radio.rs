@@ -5,27 +5,46 @@ pub struct Radio {
     packet: [u8; 258]
 }
 
+pub enum Mode {
+    Ble1Mbit,
+    Ble2Mbit,
+    Nrf1Mbit,
+    Nrf2Mbit
+}
+
 impl Radio {
     pub fn new(radio: pac::RADIO) -> Radio {
         Radio {radio: radio, packet: [0; 258]}
     }
     
-    pub fn power_off(&self) {
-        self.radio.power.write(|w| { w.power().disabled() });
+    pub fn set_enabled(&mut self, enabled: bool) {
+        match enabled {
+            true => self.radio.power.write(|w| { w.power().disabled() }),
+            false => self.radio.power.write(|w| { w.power().enabled() })
+        }
     }
 
-    pub fn power_enabled(&self) -> bool {
+    pub fn get_enabled(&self) -> bool {
         self.radio.power.read().power().bit()
     }
 
-    pub fn init_transmission(&self) {
+    pub fn set_mode(&mut self, mode: Mode) {
+        match mode {
+          Mode::Ble1Mbit => self.radio.mode.write(|w| { w.mode().ble_1mbit() }),
+          Mode::Ble2Mbit => self.radio.mode.write(|w| { w.mode().ble_2mbit() }),
+          Mode::Nrf1Mbit => self.radio.mode.write(|w| { w.mode().nrf_1mbit() }),
+          Mode::Nrf2Mbit => self.radio.mode.write(|w| { w.mode().nrf_2mbit() }),
+        }
+    }
+
+    pub fn init_transmission(&mut self) {
         // POWER
         // 1 (default)
-        self.radio.power.write(|w| { w.power().enabled() });
+        self.set_enabled(true);
 
         // MODE
         // MODE: data rate and modulation
-        self.radio.mode.write(|w| { w.mode().ble_1mbit() });
+        self.set_mode(Mode::Ble1Mbit);
 
         // FREQUENCY
         // FREQUENCY: [0..100] freq = 2400 MHz + freq => 90
