@@ -12,6 +12,11 @@ pub enum Mode {
     Nrf2Mbit
 }
 
+#[derive(Debug)]
+pub enum Error {
+    Frequency
+}
+
 impl Radio {
     pub fn new(radio: pac::RADIO) -> Radio {
         Radio {radio: radio, packet: [0; 258]}
@@ -37,6 +42,22 @@ impl Radio {
         }
     }
 
+    /// Set the frequency
+    ///
+    /// # Arguments
+    ///
+    /// * `frequency` - Frequency in MHz; allowed values are >= 2400 and <= 2500 MHz
+    ///
+    pub fn set_frequency(&mut self, frequency: u16) -> Result<(), Error> {
+        if frequency < 2400 || frequency > 2500 {
+            Err(Error::Frequency)
+        } else {
+            self.radio.frequency.write(|w| unsafe { w.frequency().bits((frequency - 2400) as u8) });
+
+            Ok(())
+        }
+    }
+
     pub fn init_transmission(&mut self) {
         // POWER
         // 1 (default)
@@ -48,7 +69,7 @@ impl Radio {
 
         // FREQUENCY
         // FREQUENCY: [0..100] freq = 2400 MHz + freq => 90
-        self.radio.frequency.write(|w| unsafe { w.frequency().bits(90) });
+        self.set_frequency(2490).unwrap();
 
         // PCNF0
         // LFLEN: length field length in bits => 8
