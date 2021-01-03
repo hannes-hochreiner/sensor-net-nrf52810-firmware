@@ -3,16 +3,16 @@
 
 // pick a panicking behavior
 use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
-// use panic_abort as _; // requires nightly
-// use panic_itm as _; // logs messages over ITM; requires ITM support
-// use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
+                     // use panic_abort as _; // requires nightly
+                     // use panic_itm as _; // logs messages over ITM; requires ITM support
+                     // use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
 
 // use cortex_m::asm;
 // use cortex_m_rt::entry;
+use common::power;
+use common::radio;
 use nrf52810_hal as hal;
 use rtic::app;
-use common::radio;
-use common::power;
 
 #[app(device = nrf52810_pac, peripherals = true)]
 const APP: () = {
@@ -32,7 +32,7 @@ const APP: () = {
         let device: nrf52810_pac::Peripherals = cx.device;
 
         // enable DC/DC converter
-        device.POWER.dcdcen.write(|w| { w.dcdcen().enabled() });
+        device.POWER.dcdcen.write(|w| w.dcdcen().enabled());
 
         // set up clocks
         hal::clocks::Clocks::new(device.CLOCK)
@@ -42,13 +42,15 @@ const APP: () = {
 
         // set up RTC
         let mut rtc = hal::rtc::Rtc::new(device.RTC0, 3276).unwrap();
-        rtc.set_compare(hal::rtc::RtcCompareReg::Compare0, 600).unwrap();
+        rtc.set_compare(hal::rtc::RtcCompareReg::Compare0, 600)
+            .unwrap();
         rtc.enable_event(hal::rtc::RtcInterrupt::Compare0);
         rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         rtc.enable_counter();
 
         // get device id
-        let device_id = ((device.FICR.deviceid[1].read().bits() as u64) << 32) + (device.FICR.deviceid[0].read().bits() as u64);
+        let device_id = ((device.FICR.deviceid[1].read().bits() as u64) << 32)
+            + (device.FICR.deviceid[0].read().bits() as u64);
         let part_id = device.FICR.info.part.read().bits();
 
         // set up sensor
@@ -81,7 +83,9 @@ const APP: () = {
 
     #[task(binds = RTC0, resources = [radio, rtc, device_id, part_id, index, i2c])]
     fn rtc_handler(ctx: rtc_handler::Context) {
-        ctx.resources.rtc.reset_event(hal::rtc::RtcInterrupt::Compare0);
+        ctx.resources
+            .rtc
+            .reset_event(hal::rtc::RtcInterrupt::Compare0);
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
 
         ctx.resources.i2c.enable();

@@ -3,9 +3,9 @@
 
 // pick a panicking behavior
 use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
-// use panic_abort as _; // requires nightly
-// use panic_itm as _; // logs messages over ITM; requires ITM support
-// use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
+                     // use panic_abort as _; // requires nightly
+                     // use panic_itm as _; // logs messages over ITM; requires ITM support
+                     // use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
 
 // use cortex_m::asm;
 // use cortex_m_rt::entry;
@@ -33,8 +33,10 @@ const APP: () = {
         sensor_id: u16,
         #[init(0)]
         index: u32,
-        led_green: nrf52810_hal::gpio::p0::P0_24<nrf52810_hal::gpio::Output<nrf52810_hal::gpio::PushPull>>,
-        led_red: nrf52810_hal::gpio::p0::P0_23<nrf52810_hal::gpio::Output<nrf52810_hal::gpio::PushPull>>
+        led_green:
+            nrf52810_hal::gpio::p0::P0_24<nrf52810_hal::gpio::Output<nrf52810_hal::gpio::PushPull>>,
+        led_red:
+            nrf52810_hal::gpio::p0::P0_23<nrf52810_hal::gpio::Output<nrf52810_hal::gpio::PushPull>>,
     }
 
     #[init]
@@ -48,26 +50,32 @@ const APP: () = {
             rxd: port0.p0_08.into_floating_input().degrade(),
             txd: port0.p0_06.into_push_pull_output(Level::Low).degrade(),
             cts: None,
-            rts: None
-            // cts: Some(port0.p0_07.into_floating_input().degrade()),
-            // rts: Some(port0.p0_05.into_push_pull_output(Level::Low).degrade())
+            rts: None, // cts: Some(port0.p0_07.into_floating_input().degrade()),
+                       // rts: Some(port0.p0_05.into_push_pull_output(Level::Low).degrade())
         };
-        let uart = hal::uarte::Uarte::new(device.UARTE0, pins, hal::uarte::Parity::EXCLUDED, hal::uarte::Baudrate::BAUD1M);
-        
+        let uart = hal::uarte::Uarte::new(
+            device.UARTE0,
+            pins,
+            hal::uarte::Parity::EXCLUDED,
+            hal::uarte::Baudrate::BAUD1M,
+        );
+
         let mut delay = hal::delay::Delay::new(core.SYST);
-        
+
         let i2c_pins = hal::twim::Pins {
             sda: port0.p0_15.into_floating_input().degrade(),
             scl: port0.p0_13.into_floating_input().degrade(),
         };
         let mut i2c = hal::twim::Twim::new(device.TWIM0, i2c_pins, hal::twim::Frequency::K400);
-        
+
         // set up LEDs
         led_green.set_low().unwrap();
         led_red.set_low().unwrap();
 
         // set up SHT3
-        let sensor_id = common::sht3::SHT3::new(&mut i2c, &mut delay).init().unwrap();
+        let sensor_id = common::sht3::SHT3::new(&mut i2c, &mut delay)
+            .init()
+            .unwrap();
 
         // set up clocks
         hal::clocks::Clocks::new(device.CLOCK)
@@ -77,7 +85,8 @@ const APP: () = {
 
         // set up RTC
         let mut rtc = hal::rtc::Rtc::new(device.RTC0, 3276).unwrap(); // => 10Hz
-        rtc.set_compare(hal::rtc::RtcCompareReg::Compare0, 600).unwrap(); // => 1 min
+        rtc.set_compare(hal::rtc::RtcCompareReg::Compare0, 600)
+            .unwrap(); // => 1 min
         rtc.enable_event(hal::rtc::RtcInterrupt::Compare0);
         rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         rtc.enable_counter();
@@ -88,7 +97,8 @@ const APP: () = {
         radio.start_reception();
 
         // get device id
-        let device_id = ((device.FICR.deviceid[1].read().bits() as u64) << 32) + (device.FICR.deviceid[0].read().bits() as u64);
+        let device_id = ((device.FICR.deviceid[1].read().bits() as u64) << 32)
+            + (device.FICR.deviceid[0].read().bits() as u64);
         let part_id = device.FICR.info.part.read().bits();
 
         init::LateResources {
@@ -101,13 +111,15 @@ const APP: () = {
             part_id: part_id,
             sensor_id: sensor_id,
             led_green: led_green,
-            led_red: led_red
+            led_red: led_red,
         }
     }
 
     #[task(binds = RTC0, resources = [uart, rtc, i2c, delay, device_id, part_id, sensor_id, index, led_green])]
     fn rtc_handler(ctx: rtc_handler::Context) {
-        ctx.resources.rtc.reset_event(hal::rtc::RtcInterrupt::Compare0);
+        ctx.resources
+            .rtc
+            .reset_event(hal::rtc::RtcInterrupt::Compare0);
         ctx.resources.led_green.set_high().unwrap();
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
         let mut sht3 = common::sht3::SHT3::new(ctx.resources.i2c, ctx.resources.delay);
@@ -131,22 +143,34 @@ const APP: () = {
         let event_disabled = radio.event_disabled();
         let event_rssiend = radio.event_rssiend();
         let event_crcok = radio.event_crcok();
-        
+
         radio.event_reset_all();
 
         if event_address && event_payload && event_end && event_crcok && event_rssiend {
             if let Some(data) = radio.payload() {
                 ctx.resources.led_red.set_high().unwrap();
-                ctx.resources.uart.write_fmt(format_args!("{{\
+                ctx.resources
+                    .uart
+                    .write_fmt(format_args!(
+                        "{{\
                     \"type\": \"gateway-bl651-radio\",\
                     \"rssi\": -{},\
-                    \"data\": \"", radio.rssi())).unwrap();
+                    \"data\": \"",
+                        radio.rssi()
+                    ))
+                    .unwrap();
 
                 for byte in data {
-                    ctx.resources.uart.write_fmt(format_args!("{:0>2x}", byte)).unwrap();
+                    ctx.resources
+                        .uart
+                        .write_fmt(format_args!("{:0>2x}", byte))
+                        .unwrap();
                 }
-                
-                ctx.resources.uart.write_fmt(format_args!("\"}}\n")).unwrap();
+
+                ctx.resources
+                    .uart
+                    .write_fmt(format_args!("\"}}\n"))
+                    .unwrap();
                 // ctx.resources.uart.write_fmt(format_args!("payload: {:?}\n", radio.payload())).unwrap();
                 ctx.resources.led_red.set_low().unwrap();
             }
