@@ -29,6 +29,12 @@ test = false
 bench = false
 
 [[bin]]
+name = "sensor-net-gateway-bl651-sensor"
+path = "src/bin/sensor-net-gateway-bl651-sensor.rs"
+test = false
+bench = false
+
+[[bin]]
 name = "personal-beacon"
 path = "src/bin/personal-beacon.rs"
 test = false
