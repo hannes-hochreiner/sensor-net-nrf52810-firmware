@@ -27,8 +27,8 @@ impl Radio {
 
     pub fn set_enabled(&mut self, enabled: bool) {
         match enabled {
-            true => self.radio.power.write(|w| w.power().disabled()),
-            false => self.radio.power.write(|w| w.power().enabled()),
+            true => self.radio.power.write(|w| w.power().enabled()),
+            false => self.radio.power.write(|w| w.power().disabled()),
         }
     }
 
