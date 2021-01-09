@@ -8,8 +8,8 @@
             "dependsOn": [
               "cargo build"
             ]
-          },
-          {
+        },
+        {
             /*
              * This is the default cargo build task,
              * but we need to provide a label for it,

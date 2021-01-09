@@ -29,6 +29,11 @@ The messages from the gateway are formatted as JSON with a terminating line feed
     "data": "<string (hex encoded binary data)>"
   }
 
+SensorNet Gateway BL651 - Sensor
+--------------------------------
+
+
+
 Personal Beacon
 ---------------
 

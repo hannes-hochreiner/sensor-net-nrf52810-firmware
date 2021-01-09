@@ -18,6 +18,7 @@ use core::format_args;
 use rtic::app;
 // use common::sht3;
 use common::radio;
+use common::utils::{copy_into_array, get_key};
 // use embedded_hal::blocking::{i2c as i2c, delay as delay};
 
 #[app(device = nrf52810_pac, peripherals = true)]
@@ -37,6 +38,8 @@ const APP: () = {
             nrf52810_hal::gpio::p0::P0_24<nrf52810_hal::gpio::Output<nrf52810_hal::gpio::PushPull>>,
         led_red:
             nrf52810_hal::gpio::p0::P0_23<nrf52810_hal::gpio::Output<nrf52810_hal::gpio::PushPull>>,
+        ccm: hal::ccm::Ccm,
+        key: [u8; 16],
     }
 
     #[init]
@@ -101,6 +104,9 @@ const APP: () = {
             + (device.FICR.deviceid[0].read().bits() as u64);
         let part_id = device.FICR.info.part.read().bits();
 
+        // set up ccm
+        let ccm = hal::ccm::Ccm::init(device.CCM, device.AAR, hal::ccm::DataRate::_2Mbit);
+
         init::LateResources {
             uart: uart,
             radio: radio,
@@ -112,6 +118,8 @@ const APP: () = {
             sensor_id: sensor_id,
             led_green: led_green,
             led_red: led_red,
+            ccm: ccm,
+            key: get_key(),
         }
     }
 
@@ -131,7 +139,7 @@ const APP: () = {
         // ctx.resources.rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
     }
 
-    #[task(binds = RADIO, resources = [uart, radio, led_red])]
+    #[task(binds = RADIO, resources = [uart, radio, led_red, ccm, key])]
     fn radio_handler(ctx: radio_handler::Context) {
         let radio = ctx.resources.radio;
 
@@ -160,11 +168,40 @@ const APP: () = {
                     ))
                     .unwrap();
 
-                for byte in data {
+                if data.len() > 16 && (u16::from_le_bytes([data[0], data[1]]) & 0x8000 == 0x8000) {
+                    let mut iv = [0u8; 8];
+                    copy_into_array(&data[2..10], &mut iv);
+                    let mut ccm_data = hal::ccm::CcmData::new(*ctx.resources.key, iv);
+                    let mut data_enc = [0u8; 258];
+                    data_enc[1] = (data.len() - 2 - 8) as u8;
+                    copy_into_array(&data[10..], &mut data_enc[3..]);
+                    let mut data_plain = [0u8; 254];
+                    let mut scratch = [0u8; 274];
                     ctx.resources
-                        .uart
-                        .write_fmt(format_args!("{:0>2x}", byte))
+                        .ccm
+                        .decrypt_packet(&mut ccm_data, &mut data_plain, &data_enc, &mut scratch)
                         .unwrap();
+
+                    for byte in data[0..2].iter() {
+                        ctx.resources
+                            .uart
+                            .write_fmt(format_args!("{:0>2x}", byte))
+                            .unwrap();
+                    }
+
+                    for cntr in 3..data_plain[1] + 3 {
+                        ctx.resources
+                            .uart
+                            .write_fmt(format_args!("{:0>2x}", data_plain[cntr as usize]))
+                            .unwrap();
+                    }
+                } else {
+                    for byte in data {
+                        ctx.resources
+                            .uart
+                            .write_fmt(format_args!("{:0>2x}", byte))
+                            .unwrap();
+                    }
                 }
 
                 ctx.resources

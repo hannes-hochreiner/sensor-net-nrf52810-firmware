@@ -13,7 +13,9 @@ use nrf52810_hal as hal;
 // use nrf52810_hal::prelude::_embedded_hal_blocking_delay_DelayMs;
 use rtic::app;
 // use common::sht3;
+use common::power;
 use common::radio;
+use common::utils::{copy_into_array, get_key};
 // use embedded_hal::blocking::{i2c as i2c, delay as delay};
 
 #[app(device = nrf52810_pac, peripherals = true)]
@@ -28,6 +30,9 @@ const APP: () = {
         sensor_id: u16,
         #[init(0)]
         index: u32,
+        rng: hal::rng::Rng,
+        ccm: hal::ccm::Ccm,
+        key: [u8; 16],
     }
 
     #[init]
@@ -47,9 +52,11 @@ const APP: () = {
             .init()
             .unwrap();
 
+        i2c.disable();
+
         // set up clocks
         hal::clocks::Clocks::new(device.CLOCK)
-            .set_lfclk_src_rc()
+            .set_lfclk_src_external(hal::clocks::LfOscConfiguration::NoExternalNoBypass)
             .start_lfclk()
             .enable_ext_hfosc();
 
@@ -62,14 +69,23 @@ const APP: () = {
         rtc.enable_counter();
 
         // set up radio
-        let radio = radio::Radio::new(device.RADIO);
-        radio.init_reception();
-        radio.start_reception();
+        let mut radio = radio::Radio::new(device.RADIO);
+        radio.set_enabled(false);
 
         // get device id
         let device_id = ((device.FICR.deviceid[1].read().bits() as u64) << 32)
             + (device.FICR.deviceid[0].read().bits() as u64);
         let part_id = device.FICR.info.part.read().bits();
+
+        // set up rng
+        let rng = hal::rng::Rng::new(device.RNG);
+
+        // set up ccm
+        let ccm = hal::ccm::Ccm::init(device.CCM, device.AAR, hal::ccm::DataRate::_2Mbit);
+
+        // set up power
+        let mut power = power::Power::new(device.POWER);
+        power.set_mode(power::Mode::LowPower);
 
         init::LateResources {
             radio: radio,
@@ -79,19 +95,54 @@ const APP: () = {
             device_id: device_id,
             part_id: part_id,
             sensor_id: sensor_id,
+            rng: rng,
+            ccm: ccm,
+            key: get_key(),
         }
     }
 
-    #[task(binds = RTC0, resources = [rtc, i2c, delay, device_id, part_id, sensor_id, index])]
+    #[task(binds = RTC0, resources = [rtc, radio, i2c, delay, device_id, part_id, sensor_id, index, rng, ccm, key])]
     fn rtc_handler(ctx: rtc_handler::Context) {
         ctx.resources
             .rtc
             .reset_event(hal::rtc::RtcInterrupt::Compare0);
         // ctx.resources.rtc.disable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
+        ctx.resources.i2c.enable();
+
         let mut sht3 = common::sht3::SHT3::new(ctx.resources.i2c, ctx.resources.delay);
         let meas = sht3.get_measurement().unwrap();
-        // ctx.resources.uart.write_fmt(format_args!("{{\"type\":\"gateway-bl651-sensor\",\"message\":{{\"mcuId\":\"{:0>8x}-{:0>16x}\",\"index\":{},\"sensorId\":\"{:0>4x}\",\"temperature\":{},\"humidity\":{}}}}}\n", ctx.resources.part_id, ctx.resources.device_id, ctx.resources.index, ctx.resources.sensor_id, meas.temperature, meas.humidity)).unwrap();
+
+        core::mem::drop(sht3);
+        ctx.resources.i2c.disable();
+
+        let mut iv = [0u8; 8];
+        ctx.resources.rng.random(&mut iv);
+        let mut ccm_data = hal::ccm::CcmData::new(*ctx.resources.key, iv);
+
+        // assemble encryption package
+        let mut enc_pac = [0u8; 29];
+
+        enc_pac[1] = 26;
+        copy_into_array(&ctx.resources.device_id.to_le_bytes(), &mut enc_pac[3..11]);
+        copy_into_array(&ctx.resources.part_id.to_le_bytes(), &mut enc_pac[11..15]);
+        copy_into_array(&ctx.resources.index.to_le_bytes(), &mut enc_pac[15..19]);
+        copy_into_array(&ctx.resources.sensor_id.to_le_bytes(), &mut enc_pac[19..21]);
+        copy_into_array(&meas.temperature.to_le_bytes(), &mut enc_pac[21..25]);
+        copy_into_array(&meas.humidity.to_le_bytes(), &mut enc_pac[25..29]);
+
+        let mut enc_pac_enc = [0u8; 33];
+        let mut scratch = [0u8; 43];
+
+        ctx.resources
+            .ccm
+            .encrypt_packet(&mut ccm_data, &enc_pac, &mut enc_pac_enc, &mut scratch)
+            .unwrap();
+
+        let data: &[&[u8]] = &[&0x8005u16.to_le_bytes(), &iv, &enc_pac_enc[3..33]];
+
         *ctx.resources.index += 1;
+        ctx.resources.radio.init_transmission();
+        ctx.resources.radio.start_transmission(data);
         ctx.resources.rtc.clear_counter();
         // ctx.resources.rtc.enable_interrupt(hal::rtc::RtcInterrupt::Compare0, None);
     }
@@ -99,50 +150,9 @@ const APP: () = {
     #[task(binds = RADIO, resources = [radio])]
     fn radio_handler(ctx: radio_handler::Context) {
         let radio = ctx.resources.radio;
+        let _event_disabled = radio.event_disabled();
 
-        radio.clear_all();
-
-        // let event_address = radio.event_address();
-        // let event_payload = radio.event_payload();
-        // let event_end = radio.event_end();
-        // let event_disabled = radio.event_disabled();
-        // let event_rssiend = radio.event_rssiend();
-        // let event_crcok = radio.event_crcok();
-
-        // radio.event_reset_all();
-
-        // if event_address && event_payload && event_end && event_crcok && event_rssiend {
-        //     if let Some(data) = radio.payload() {
-        //         ctx.resources.led_red.set_high().unwrap();
-        //         ctx.resources
-        //             .uart
-        //             .write_fmt(format_args!(
-        //                 "{{\
-        //             \"type\": \"gateway-bl651-radio\",\
-        //             \"rssi\": -{},\
-        //             \"data\": \"",
-        //                 radio.rssi()
-        //             ))
-        //             .unwrap();
-
-        //         for byte in data {
-        //             ctx.resources
-        //                 .uart
-        //                 .write_fmt(format_args!("{:0>2x}", byte))
-        //                 .unwrap();
-        //         }
-
-        //         ctx.resources
-        //             .uart
-        //             .write_fmt(format_args!("\"}}\n"))
-        //             .unwrap();
-        //         // ctx.resources.uart.write_fmt(format_args!("payload: {:?}\n", radio.payload())).unwrap();
-        //         ctx.resources.led_red.set_low().unwrap();
-        //     }
-        // }
-
-        // if event_disabled {
-        //     radio.start_reception();
-        // }
+        radio.event_reset_all();
+        radio.set_enabled(false);
     }
 };
