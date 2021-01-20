@@ -1,0 +1,7 @@
+blockdiag {
+  beginpoint [shape = beginpoint, label = ""];
+  endpoint [shape = endpoint, label = ""];
+
+  beginpoint -> "get sensor value\n(TWIM, TIMER)" -> "create ccm package" -> "encrypt ccm package\n(CCM)";
+  beginpoint -> "get iv\n(RNG)" -> "generate key\n(CCM)" -> "encrypt ccm package\n(CCM)" -> "create radio package" -> "send radio package\n(RADIO)" -> endpoint;
+}
