@@ -138,7 +138,7 @@ const APP: () = {
             .encrypt_packet(&mut ccm_data, &enc_pac, &mut enc_pac_enc, &mut scratch)
             .unwrap();
 
-        let data: &[&[u8]] = &[&0x8005u16.to_le_bytes(), &iv, &enc_pac_enc[3..33]];
+        let data: &[&[u8]] = &[&0x8004u16.to_le_bytes(), &iv, &enc_pac_enc[3..33]];
 
         *ctx.resources.index += 1;
         ctx.resources.radio.init_transmission();

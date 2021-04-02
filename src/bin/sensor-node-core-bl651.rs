@@ -88,8 +88,8 @@ fn main() -> ! {
 
     let mut rtc = rtc::Rtc::new(device.RTC0, &mut core.NVIC);
     rtc.set_prescaler(3276); // 0.1 s
-    rtc.set_compare(30); // 3 s
-    // rtc.set_compare(600); // 1 min
+    // rtc.set_compare(30); // 3 s
+    rtc.set_compare(600); // 1 min
 
     // initialize index
     let mut index = 0u32;

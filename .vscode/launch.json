@@ -29,6 +29,22 @@
             "target": "target/thumbv7em-none-eabi/debug/sensor-net-gateway-bl651-sensor",
             "cwd": "${workspaceRoot}",
             "autorun": [
+                "target remote | ssh hc1 \"sudo openocd -c 'gdb_port pipe; log_output /dev/null; source [find interface/raspberrypi-native.cfg]; transport select swd; source [find target/nrf52.cfg]; bcm2835gpio_swd_nums 27 22; bcm2835gpio_trst_num 17; init'\"",
+                "monitor reset halt",
+                "load",
+                "tbreak main",
+                "c"
+            ],
+            "preLaunchTask": "pre-launch"
+        },
+        {
+            "name": "Debug Sensor Node Core BL651",
+            "type": "gdb",
+            "request": "launch",
+            "gdbpath": "gdb",
+            "target": "target/thumbv7em-none-eabi/debug/sensor-node-core-bl651",
+            "cwd": "${workspaceRoot}",
+            "autorun": [
                 "target remote | ssh hc1 \"sudo openocd -c 'gdb_port pipe; log_output /dev/null; source [find interface/raspberrypi-native.cfg]; transport select swd; source [find target/nrf52.cfg]; bcm2835gpio_swd_nums 23 24; bcm2835gpio_trst_num 18; init'\"",
                 "monitor reset halt",
                 "load",
@@ -42,7 +58,23 @@
             "type": "gdb",
             "request": "launch",
             "gdbpath": "gdb",
-            "target": "target/thumbv7em-none-eabi/debug/sensor-node-core-bl651",
+            "target": "target/thumbv7em-none-eabi/debug/sensor-node-bl651",
+            "cwd": "${workspaceRoot}",
+            "autorun": [
+                "target remote | ssh hc1 \"sudo openocd -c 'gdb_port pipe; log_output /dev/null; source [find interface/raspberrypi-native.cfg]; transport select swd; source [find target/nrf52.cfg]; bcm2835gpio_swd_nums 23 24; bcm2835gpio_trst_num 18; init'\"",
+                "monitor reset halt",
+                "load",
+                "tbreak main",
+                "c"
+            ],
+            "preLaunchTask": "pre-launch"
+        },
+        {
+            "name": "Debug Async Test",
+            "type": "gdb",
+            "request": "launch",
+            "gdbpath": "gdb",
+            "target": "target/thumbv7em-none-eabi/debug/async-test",
             "cwd": "${workspaceRoot}",
             "autorun": [
                 "target remote | ssh hc1 \"sudo openocd -c 'gdb_port pipe; log_output /dev/null; source [find interface/raspberrypi-native.cfg]; transport select swd; source [find target/nrf52.cfg]; bcm2835gpio_swd_nums 23 24; bcm2835gpio_trst_num 18; init'\"",

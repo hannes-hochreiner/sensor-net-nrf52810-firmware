@@ -12,3 +12,5 @@ pub mod sht4x;
 pub mod timer;
 pub mod twim;
 pub mod utils;
+pub mod rng2;
+pub mod saadc;

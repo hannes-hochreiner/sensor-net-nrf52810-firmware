@@ -168,7 +168,9 @@ const APP: () = {
                     ))
                     .unwrap();
 
-                if data.len() > 16 && (u16::from_le_bytes([data[0], data[1]]) & 0x8000 == 0x8000) {
+                let mut package_type = u16::from_le_bytes([data[0], data[1]]);
+
+                if data.len() > 16 && (package_type & 0x8000 == 0x8000) {
                     let mut iv = [0u8; 8];
                     copy_into_array(&data[2..10], &mut iv);
                     let mut ccm_data = hal::ccm::CcmData::new(*ctx.resources.key, iv);
@@ -182,10 +184,12 @@ const APP: () = {
                         .decrypt_packet(&mut ccm_data, &mut data_plain, &data_enc, &mut scratch)
                         .unwrap();
 
-                    for byte in data[0..2].iter() {
+                    package_type = package_type & 0x7FFF;
+                    
+                    for byte in package_type.to_le_bytes().iter() {
                         ctx.resources
                             .uart
-                            .write_fmt(format_args!("{:0>2x}", byte))
+                            .write_fmt(format_args!("{:0>2x}", *byte))
                             .unwrap();
                     }
 

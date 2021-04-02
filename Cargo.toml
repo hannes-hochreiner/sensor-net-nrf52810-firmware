@@ -15,6 +15,8 @@ cortex-m-rtic = "0.5"
 nrf52810-pac = "0.9"
 #nrf52810-hal = { version="0.12", features = ["rt"] }
 nrf52810-hal = { path = "/opt/hannes/nrf-hal/nrf52810-hal", features = ["rt"] }
+#futures = { version = "0.3", default-features = false }
+#alloc-no-stdlib = "2"
 
 [lib]
 name = "common"
@@ -23,6 +25,12 @@ test = false
 bench = false
 
 # this lets you use `cargo fix`!
+[[bin]]
+name = "async-test"
+path = "src/bin/async-test.rs"
+test = false
+bench = false
+
 [[bin]]
 name = "sensor-net-gateway-bl651"
 path = "src/bin/sensor-net-gateway-bl651.rs"
@@ -44,6 +52,12 @@ bench = false
 [[bin]]
 name = "sensor-node-core-bl651"
 path = "src/bin/sensor-node-core-bl651.rs"
+test = false
+bench = false
+
+[[bin]]
+name = "sensor-node-bl651"
+path = "src/bin/sensor-node-bl651.rs"
 test = false
 bench = false
 
