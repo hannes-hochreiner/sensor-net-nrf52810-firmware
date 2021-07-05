@@ -185,7 +185,7 @@ const APP: () = {
                         .unwrap();
 
                     package_type = package_type & 0x7FFF;
-                    
+
                     for byte in package_type.to_le_bytes().iter() {
                         ctx.resources
                             .uart

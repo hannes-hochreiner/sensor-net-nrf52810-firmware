@@ -13,8 +13,8 @@ panic-halt = "0.2"
 embedded-hal = "0.2"
 cortex-m-rtic = "0.5"
 nrf52810-pac = "0.9"
-#nrf52810-hal = { version="0.12", features = ["rt"] }
-nrf52810-hal = { path = "/opt/hannes/nrf-hal/nrf52810-hal", features = ["rt"] }
+nrf52810-hal = { version="0.12", features = ["rt"] }
+# nrf52810-hal = { path = "/opt/hannes/nrf-hal/nrf52810-hal", features = ["rt"] }
 #futures = { version = "0.3", default-features = false }
 #alloc-no-stdlib = "2"
 

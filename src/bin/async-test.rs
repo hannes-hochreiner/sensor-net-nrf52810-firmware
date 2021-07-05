@@ -1,21 +1,21 @@
 #![no_std]
 #![no_main]
 
-use panic_halt as _;
-use nrf52810_pac as pac;
-use pac::{NVIC, interrupt};
 use common::rng2;
 use core::{cell::Cell, future, task::Waker};
+use core::{
+    future::Future,
+    pin::Pin,
+    ptr::null,
+    task::{Context, RawWaker, RawWakerVTable},
+};
 use cortex_m::interrupt::Mutex;
-use core::{pin::Pin, future::Future, ptr::null, task::{Context, RawWaker, RawWakerVTable}};
+use nrf52810_pac as pac;
+use pac::{interrupt, NVIC};
+use panic_halt as _;
 
 static THREAD_STORE: Mutex<Cell<u32>> = Mutex::new(Cell::new(0u32));
-static RWV: RawWakerVTable = RawWakerVTable::new(
-    clone,
-    wake,
-    wake_by_ref,
-    drop
-);
+static RWV: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
@@ -24,7 +24,7 @@ fn main() -> ! {
     let mut rng = rng2::Rng2::new(device.RNG, &mut core.NVIC);
     // let rng_future: Pin<&mut Future<Output = u8>> = Pin::new(&mut rng);
     let mut rng_future: Pin<&mut Future<Output = u8>> = unsafe { Pin::new_unchecked(&mut rng) };
- 
+
     loop {
         // core::future::Future.poll_fn()
         // rng_future.poll();
@@ -35,12 +35,9 @@ fn main() -> ! {
 }
 
 unsafe fn clone(_: *const ()) -> RawWaker {
-    RawWaker::new(core::ptr::null(), &RawWakerVTable::new(
-            clone,
-            wake,
-            wake_by_ref,
-            drop,
-        )
+    RawWaker::new(
+        core::ptr::null(),
+        &RawWakerVTable::new(clone, wake, wake_by_ref, drop),
     )
 }
 
@@ -48,4 +45,4 @@ unsafe fn wake(_: *const ()) {}
 
 unsafe fn wake_by_ref(_: *const ()) {}
 
-unsafe fn drop (_: *const ()) {}
+unsafe fn drop(_: *const ()) {}

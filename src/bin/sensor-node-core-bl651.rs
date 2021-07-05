@@ -35,7 +35,7 @@ fn main() -> ! {
 
     let clock = clock::Clock::new(device.CLOCK);
     let mut clock = clock.start_lfclk(clock::Source::Xtal, false, false); // TODO: switch back to xtal
-    // let mut clock = clock.start_lfclk(clock::Source::RC, false, false);
+                                                                          // let mut clock = clock.start_lfclk(clock::Source::RC, false, false);
 
     // set up radio
     let mut radio = radio::Radio::new(device.RADIO);
@@ -88,7 +88,7 @@ fn main() -> ! {
 
     let mut rtc = rtc::Rtc::new(device.RTC0, &mut core.NVIC);
     rtc.set_prescaler(3276); // 0.1 s
-    // rtc.set_compare(30); // 3 s
+                             // rtc.set_compare(30); // 3 s
     rtc.set_compare(600); // 1 min
 
     // initialize index

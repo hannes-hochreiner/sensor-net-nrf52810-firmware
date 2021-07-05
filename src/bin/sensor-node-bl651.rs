@@ -25,10 +25,11 @@ use common::clock;
 use common::p0;
 use common::rng;
 use common::rtc;
+use common::saadc;
 use common::sht4x;
 use common::timer;
 use common::twim;
-use common::saadc;
+use common::mmc5603nj;
 // use embedded_hal::blocking::delay::DelayMs;
 
 #[cortex_m_rt::entry]
@@ -94,8 +95,8 @@ fn main() -> ! {
     //     // trigger sample task
     //     device.SAADC.tasks_sample.write(|w| w.tasks_sample().trigger());
     //     while device.SAADC.events_end.read().events_end().is_not_generated() {}
-        
-    //     let res = adc_result as f32 * 0.6 / 1024.0 / 0.4; 
+
+    //     let res = adc_result as f32 * 0.6 / 1024.0 / 0.4;
     //     // Chevron: 1023 => 1.49853528 2021-03-01 20:26
     //     // Premio: 848 => 1.2421875 2021-03-01 20:32
 
@@ -104,7 +105,7 @@ fn main() -> ! {
     // }
 
     // set up timer
-    // let timer = timer::Timer::new(device.TIMER0, &mut core.NVIC);
+    let timer = timer::Timer::new(device.TIMER0, &mut core.NVIC);
 
     // // set up twim
     // let mut p0 = p0::P0::new(device.P0);
@@ -127,9 +128,11 @@ fn main() -> ! {
     //     p0::Sense::Disabled,
     // );
 
-    // let twim = twim::Twim::new(device.TWIM0, &mut core.NVIC, 25, 26, twim::Frequency::K400);
+    let twim = twim::Twim::new(device.TWIM0, &mut core.NVIC, 23, 22, twim::Frequency::K100);
 
     // let mut sht4x = sht4x::SHT4X::new(twim, timer, 0x44);
+    let mut mmc = mmc5603nj::MMC5603NJ::new(twim, 0b00110000);
+
     // let mut serial = 0u32;
     // sht4x = sht4x
     //     .start_reading_serial()
@@ -139,8 +142,8 @@ fn main() -> ! {
 
     let mut rtc = rtc::Rtc::new(device.RTC0, &mut core.NVIC);
     rtc.set_prescaler(3276); // 0.1 s
-    // rtc.set_compare(30); // 3 s
-    rtc.set_compare(600); // 1 min
+    rtc.set_compare(30); // 3 s
+                         // rtc.set_compare(600); // 1 min
 
     // initialize index
     let mut index = 0u32;
@@ -156,17 +159,19 @@ fn main() -> ! {
         device.SAADC = tmp.0;
         device.P0 = tmp.1;
 
-        if battery_voltage < 1.1 {
-            let port0 = hal::gpio::p0::Parts::new(device.P0);
-            let mut p19 = port0.p0_19.into_push_pull_output(hal::gpio::Level::High);
-            p19.set_high().unwrap();
-            // device.P0.pin_cnf[19].write(|w| w.dir().output());
-            // device.P0.out.write(|w| w.pin19().high());
-            // device.P0.outset.write(|w| w.pin19().set());
-            loop {
-                let tmp = 5;
-            }
-        }
+        // reactive start
+        // if battery_voltage < 1.1 {
+        //     let port0 = hal::gpio::p0::Parts::new(device.P0);
+        //     let mut p19 = port0.p0_19.into_push_pull_output(hal::gpio::Level::High);
+        //     p19.set_high().unwrap();
+        //     // device.P0.pin_cnf[19].write(|w| w.dir().output());
+        //     // device.P0.out.write(|w| w.pin19().high());
+        //     // device.P0.outset.write(|w| w.pin19().set());
+        //     loop {
+        //         let tmp = 5;
+        //     }
+        // }
+        // reactive end
 
         // get sensor data
         let mut temperature = 25f32;
@@ -177,6 +182,8 @@ fn main() -> ! {
         //     .unwrap()
         //     .wait_for_measurement(&mut temperature, &mut humidity)
         //     .unwrap();
+
+        mmc = mmc.start_measurement().unwrap().wait_for_measurement(&mut temperature).unwrap();
 
         // create package
         let mut package: [u8; 46] = [0; 46];

@@ -59,9 +59,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-if"
-version = "0.1.10"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
+checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cortex-m"
@@ -254,7 +254,9 @@ checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 
 [[package]]
 name = "nrf-hal-common"
-version = "0.12.0"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "567951d43bf21dbda6cc962a92fce46f2cd41f356bbc39d972886964fa567bed"
 dependencies = [
  "cast",
  "cfg-if",
@@ -270,7 +272,9 @@ dependencies = [
 
 [[package]]
 name = "nrf52810-hal"
-version = "0.12.0"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57398524e8ec68f471ed42ca16dcd6d699afbf38f5ef12e1ecae1764b4dfcc9f"
 dependencies = [
  "embedded-hal",
  "nrf-hal-common",

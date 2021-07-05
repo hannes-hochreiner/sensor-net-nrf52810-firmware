@@ -27,22 +27,37 @@ impl Saadc {
         let adc_result = 0u16;
 
         // set result pointer
-        self.saadc.result.ptr.write(|w| unsafe { w.ptr().bits((&adc_result as *const u16) as u32) });
+        self.saadc
+            .result
+            .ptr
+            .write(|w| unsafe { w.ptr().bits((&adc_result as *const u16) as u32) });
 
         // start ADC
         self.saadc.tasks_start.write(|w| w.tasks_start().trigger());
-        while self.saadc.events_started.read().events_started().is_not_generated() {}
+        while self
+            .saadc
+            .events_started
+            .read()
+            .events_started()
+            .is_not_generated()
+        {}
 
         // trigger sample task
-        self.saadc.tasks_sample.write(|w| w.tasks_sample().trigger());
+        self.saadc
+            .tasks_sample
+            .write(|w| w.tasks_sample().trigger());
         while self.saadc.events_end.read().events_end().is_not_generated() {}
-        
-        let res = adc_result as f32 * 0.6 / 1024.0 / 0.4; 
+
+        let res = adc_result as f32 * 0.6 / 1024.0 / 0.4;
         // Chevron: 1023 => 1.49853528 2021-03-01 20:26
         // Premio: 848 => 1.2421875 2021-03-01 20:32
 
-        self.saadc.events_started.write(|w| w.events_started().not_generated());
-        self.saadc.events_end.write(|w| w.events_end().not_generated());
+        self.saadc
+            .events_started
+            .write(|w| w.events_started().not_generated());
+        self.saadc
+            .events_end
+            .write(|w| w.events_end().not_generated());
 
         res
     }
