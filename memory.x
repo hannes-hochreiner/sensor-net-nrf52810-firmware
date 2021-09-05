@@ -5,6 +5,7 @@ MEMORY
   /* These values correspond to the LM3S6965, one of the few devices QEMU can emulate */
   FLASH : ORIGIN = 0x00000000, LENGTH = 192K
   RAM : ORIGIN = 0x20000000, LENGTH = 24K
+  CONF : ORIGIN = 0x10001080, LENGTH = 128
 }
 
 /* This is where the call stack will be allocated. */
@@ -32,3 +33,9 @@ MEMORY
      } > RAM2
    } INSERT AFTER .bss;
 */
+
+SECTIONS {
+   .conf : ALIGN(4) {
+      KEEP(*(.conf))
+   } > CONF
+}

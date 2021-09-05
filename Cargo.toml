@@ -61,6 +61,12 @@ path = "src/bin/sensor-node-bl651.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "nrf52810-conf"
+path = "src/bin/nrf52810-conf.rs"
+test = false
+bench = false
+
 [profile.release]
 codegen-units = 1 # better optimizations
 debug = true # symbols are nice and they don't increase the size on Flash
