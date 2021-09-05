@@ -1,9 +1,11 @@
 use nrf52810_pac as pac;
 use pac::interrupt;
 
-pub struct Twim<S: State> {
-    twim: pac::TWIM0,
-    marker: core::marker::PhantomData<S>,
+pub struct Twim<'a> {
+    twim: &'a mut pac::TWIM0,
+    p0: &'a mut pac::P0,
+    scl: usize,
+    sda: usize,
 }
 
 pub enum Frequency {
@@ -12,26 +14,45 @@ pub enum Frequency {
     K400,
 }
 
-pub enum Active {}
-pub enum Inactive {}
-
-pub trait State {}
-impl State for Active {}
-impl State for Inactive {}
-
 #[derive(Debug)]
 pub enum Error {
     Transmit,
 }
 
-impl Twim<Inactive> {
+impl<'a> Twim<'a> {
     pub fn new(
-        twim: pac::TWIM0,
+        twim: &'a mut pac::TWIM0,
         nvic: &mut pac::NVIC,
+        p0: &'a mut pac::P0,
         scl: usize,
         sda: usize,
         freq: Frequency,
-    ) -> Twim<Inactive> {
+    ) -> Twim<'a> {
+        // configure pins
+        p0.pin_cnf[scl].write(|mut w| {
+            w.dir()
+                .input()
+                .pull()
+                .pullup()
+                .drive()
+                .s0d1()
+                .input()
+                .connect()
+                .sense()
+                .disabled()
+        });
+        p0.pin_cnf[sda].write(|mut w| {
+            w.dir()
+                .input()
+                .pull()
+                .pullup()
+                .drive()
+                .s0d1()
+                .input()
+                .connect()
+                .sense()
+                .disabled()
+        });
         #[allow(deprecated)]
         nvic.enable(pac::interrupt::TWIM0_TWIS0_TWI0);
         twim.psel
@@ -50,17 +71,14 @@ impl Twim<Inactive> {
         twim.shorts
             .write(|w| w.lastrx_stop().enabled().lasttx_stop().enabled());
 
-        Twim {
-            twim: twim,
-            marker: core::marker::PhantomData,
-        }
+        Twim { twim, p0, scl, sda }
     }
 
     /// Start writing to the TWI interface.
     ///
     /// This is function is not safe in the sense that the buffer could be changed or dropped
     /// before `wait` has finished.
-    pub fn start_write(self, address: u8, buffer: &[u8]) -> Twim<Active> {
+    pub fn start_write(&mut self, address: u8, buffer: &[u8]) {
         // set address
         self.twim
             .address
@@ -95,18 +113,13 @@ impl Twim<Inactive> {
         self.twim
             .tasks_starttx
             .write(|w| w.tasks_starttx().trigger());
-
-        Twim {
-            twim: self.twim,
-            marker: core::marker::PhantomData,
-        }
     }
 
     /// Start reading to the TWI interface.
     ///
     /// This is function is not safe in the sense that the buffer could be changed or dropped
     /// before `wait` has finished.
-    pub fn start_read(self, address: u8, buffer: &mut [u8]) -> Twim<Active> {
+    pub fn start_read(&mut self, address: u8, buffer: &mut [u8]) {
         // set address
         self.twim
             .address
@@ -140,16 +153,9 @@ impl Twim<Inactive> {
         self.twim
             .tasks_startrx
             .write(|w| w.tasks_startrx().trigger());
-
-        Twim {
-            twim: self.twim,
-            marker: core::marker::PhantomData,
-        }
     }
-}
 
-impl Twim<Active> {
-    pub fn wait(self) -> Result<Twim<Inactive>, Error> {
+    pub fn wait(&mut self) -> Result<(), Error> {
         while self
             .twim
             .events_stopped
@@ -181,17 +187,32 @@ impl Twim<Active> {
 
         self.twim.enable.write(|w| w.enable().disabled());
 
-        let res = Twim {
-            twim: self.twim,
-            marker: core::marker::PhantomData,
-        };
-
         match flag_error {
-            false => Ok(res),
+            false => Ok(()),
             true => Err(Error::Transmit),
         }
     }
 }
+
+// impl<'a> Drop for Twim<'a> {
+//     fn drop(&mut self) {
+//         // reset pins
+//         self.p0.pin_cnf[self.scl].write(|mut w| {
+//             w.dir().input()
+//             .pull().disabled()
+//             .drive().s0s1()
+//             .input().disconnect()
+//             .sense().disabled()
+//         });
+//         self.p0.pin_cnf[self.sda].write(|mut w| {
+//             w.dir().input()
+//             .pull().disabled()
+//             .drive().s0s1()
+//             .input().disconnect()
+//             .sense().disabled()
+//         });
+//     }
+// }
 
 #[interrupt]
 fn TWIM0_TWIS0_TWI0() {

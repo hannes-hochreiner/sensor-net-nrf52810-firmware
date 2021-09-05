@@ -30,12 +30,13 @@ use common::twim;
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
-    let device = pac::Peripherals::take().unwrap();
+    let mut device = pac::Peripherals::take().unwrap();
     let mut core = pac::CorePeripherals::take().unwrap();
 
     let clock = clock::Clock::new(device.CLOCK);
-    let mut clock = clock.start_lfclk(clock::Source::Xtal, false, false); // TODO: switch back to xtal
-                                                                          // let mut clock = clock.start_lfclk(clock::Source::RC, false, false);
+    let mut clock = clock.start_lfclk(clock::Source::Xtal, false, false);
+    // TODO: switch back to xtal
+    // let mut clock = clock.start_lfclk(clock::Source::RC, false, false);
 
     // set up radio
     let mut radio = radio::Radio::new(device.RADIO);
@@ -53,40 +54,47 @@ fn main() -> ! {
     // rng test
 
     // set up timer
-    let timer = timer::Timer::new(device.TIMER0, &mut core.NVIC);
+    // let mut timer = timer::Timer::new(&mut device.TIMER0, &mut core.NVIC);
 
-    // set up twim
-    let mut p0 = p0::P0::new(device.P0);
-    // SCL P0.25
-    p0.configure_pin(
-        25,
-        p0::Dir::Input,
-        p0::Pull::PullUp,
-        p0::Drive::S0D1,
-        p0::Input::Connect,
-        p0::Sense::Disabled,
-    );
-    // SDA P0.26
-    p0.configure_pin(
-        26,
-        p0::Dir::Input,
-        p0::Pull::PullUp,
-        p0::Drive::S0D1,
-        p0::Input::Connect,
-        p0::Sense::Disabled,
-    );
+    // // set up twim
+    // let mut p0 = p0::P0::new(device.P0);
+    // // SCL P0.25
+    // p0.configure_pin(
+    //     25,
+    //     p0::Dir::Input,
+    //     p0::Pull::PullUp,
+    //     p0::Drive::S0D1,
+    //     p0::Input::Connect,
+    //     p0::Sense::Disabled,
+    // );
+    // // SDA P0.26
+    // p0.configure_pin(
+    //     26,
+    //     p0::Dir::Input,
+    //     p0::Pull::PullUp,
+    //     p0::Drive::S0D1,
+    //     p0::Input::Connect,
+    //     p0::Sense::Disabled,
+    // );
 
-    let twim = twim::Twim::new(device.TWIM0, &mut core.NVIC, 25, 26, twim::Frequency::K400);
+    let serial = {
+        let mut timer = timer::Timer::new(&mut device.TIMER0, &mut core.NVIC);
+        let mut twim = twim::Twim::new(
+            &mut device.TWIM0,
+            &mut core.NVIC,
+            &mut device.P0,
+            25,
+            26,
+            twim::Frequency::K100,
+        );
+        let mut sht4x = sht4x::SHT4X::new(&mut twim, &mut timer, 0x44);
+        sht4x.start_reading_serial().unwrap();
+        let res = sht4x.wait_for_serial().unwrap();
+        drop(sht4x);
+        res
+    };
 
-    let mut sht4x = sht4x::SHT4X::new(twim, timer, 0x44);
-    let mut serial = 0u32;
-    sht4x = sht4x
-        .start_reading_serial()
-        .unwrap()
-        .wait_for_serial(&mut serial)
-        .unwrap();
-
-    let mut rtc = rtc::Rtc::new(device.RTC0, &mut core.NVIC);
+    let mut rtc = rtc::Rtc::new(&mut device.RTC0, &mut core.NVIC);
     rtc.set_prescaler(3276); // 0.1 s
                              // rtc.set_compare(30); // 3 s
     rtc.set_compare(600); // 1 min
@@ -96,17 +104,25 @@ fn main() -> ! {
 
     loop {
         // wait
-        rtc = rtc.start().wait();
+        rtc.start();
+        rtc.wait();
 
         // get sensor data
-        let mut temperature = 0f32;
-        let mut humidity = 0f32;
+        let measurement = {
+            let mut timer = timer::Timer::new(&mut device.TIMER0, &mut core.NVIC);
+            let mut twim = twim::Twim::new(
+                &mut device.TWIM0,
+                &mut core.NVIC,
+                &mut device.P0,
+                25,
+                26,
+                twim::Frequency::K400,
+            );
+            let mut sht4x = sht4x::SHT4X::new(&mut twim, &mut timer, 0x44);
 
-        sht4x = sht4x
-            .start_measurement()
-            .unwrap()
-            .wait_for_measurement(&mut temperature, &mut humidity)
-            .unwrap();
+            sht4x.start_measurement().unwrap();
+            sht4x.wait_for_measurement().unwrap()
+        };
 
         // create package
         let mut package: [u8; 28] = [0; 28];
@@ -116,8 +132,8 @@ fn main() -> ! {
         package[10..14].copy_from_slice(&part_id.to_le_bytes()[..]);
         package[14..18].copy_from_slice(&index.to_le_bytes()[..]);
         package[18..20].copy_from_slice(&serial.to_le_bytes()[0..2]);
-        package[20..24].copy_from_slice(&temperature.to_le_bytes()[..]);
-        package[24..28].copy_from_slice(&humidity.to_le_bytes()[..]);
+        package[20..24].copy_from_slice(&measurement.temperature.to_le_bytes()[..]);
+        package[24..28].copy_from_slice(&measurement.humidity.to_le_bytes()[..]);
 
         // increment index
         index += 1;

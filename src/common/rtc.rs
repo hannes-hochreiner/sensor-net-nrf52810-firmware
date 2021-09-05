@@ -1,28 +1,17 @@
 use nrf52810_pac as pac;
 use pac::interrupt;
 
-pub enum Active {}
-pub enum Inactive {}
-
-pub trait State {}
-impl State for Active {}
-impl State for Inactive {}
-
-pub struct Rtc<S: State> {
-    rtc: pac::RTC0,
-    marker: core::marker::PhantomData<S>,
+pub struct Rtc<'a> {
+    rtc: &'a mut pac::RTC0,
 }
 
-impl Rtc<Inactive> {
-    pub fn new(rtc: pac::RTC0, nvic: &mut pac::NVIC) -> Self {
+impl<'a> Rtc<'a> {
+    pub fn new(rtc: &'a mut pac::RTC0, nvic: &mut pac::NVIC) -> Self {
         #[allow(deprecated)]
         nvic.enable(pac::interrupt::RTC0);
         // unsafe { cortex_m::peripheral::NVIC::unmask(pac::interrupt::RTC0) };
 
-        Rtc {
-            rtc: rtc,
-            marker: core::marker::PhantomData,
-        }
+        Rtc { rtc }
     }
 
     pub fn set_prescaler(&mut self, prescaler: u16) {
@@ -37,22 +26,15 @@ impl Rtc<Inactive> {
         self.rtc.cc[0].write(|w| unsafe { w.compare().bits(compare) });
     }
 
-    pub fn start(self) -> Rtc<Active> {
+    pub fn start(&self) {
         self.rtc.events_compare[0].write(|w| w.events_compare().not_generated());
         self.rtc.evtenset.write(|w| w.compare0().set());
         self.rtc.intenset.write(|w| w.compare0().set());
         self.rtc.tasks_clear.write(|w| w.tasks_clear().trigger());
         self.rtc.tasks_start.write(|w| w.tasks_start().trigger());
-
-        Rtc {
-            rtc: self.rtc,
-            marker: core::marker::PhantomData,
-        }
     }
-}
 
-impl Rtc<Active> {
-    pub fn wait(self) -> Rtc<Inactive> {
+    pub fn wait(&self) {
         while self.rtc.events_compare[0]
             .read()
             .events_compare()
@@ -63,11 +45,6 @@ impl Rtc<Active> {
 
         self.rtc.evtenclr.write(|w| w.compare0().clear());
         self.rtc.tasks_stop.write(|w| w.tasks_stop().trigger());
-
-        Rtc {
-            rtc: self.rtc,
-            marker: core::marker::PhantomData,
-        }
     }
 }
 

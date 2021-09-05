@@ -98,7 +98,7 @@ On average: 4µA (about 5.5 years on a 200mAh battery)
 Energy Saving
 -------------
 
-  * Enabling the DC/DC converter halves the current requirement in some scenarios.
-  * Power radio off, when it is not in use (it is on after reset)
-  * Running from HFINT consumes about 10% less energy than running from HFXO
-  * Running RTC from LFXO saves about 30% in sleep as compared to using LFRC
+* Enabling the DC/DC converter halves the current requirement in some scenarios.
+* Power radio off, when it is not in use (it is on after reset)
+* Running from HFINT consumes about 10% less energy than running from HFXO
+* Running RTC from LFXO saves about 30% in sleep as compared to using LFRC

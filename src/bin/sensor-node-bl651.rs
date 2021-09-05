@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 
+use core::mem;
+
+use common::sht4x::Measurement;
 use embedded_hal::adc;
 use hal::prelude::OutputPin;
 // pick a panicking behavior
@@ -22,6 +25,7 @@ use common::radio;
 use common::utils::{copy_into_array, get_key};
 // use embedded_hal::blocking::{i2c as i2c, delay as delay};
 use common::clock;
+use common::mmc5603nj;
 use common::p0;
 use common::rng;
 use common::rtc;
@@ -29,7 +33,6 @@ use common::saadc;
 use common::sht4x;
 use common::timer;
 use common::twim;
-use common::mmc5603nj;
 // use embedded_hal::blocking::delay::DelayMs;
 
 #[cortex_m_rt::entry]
@@ -38,8 +41,8 @@ fn main() -> ! {
     let mut core = pac::CorePeripherals::take().unwrap();
 
     let clock = clock::Clock::new(device.CLOCK);
-    // let mut clock = clock.start_lfclk(clock::Source::Xtal, false, false); // TODO: switch back to xtal
-    let mut clock = clock.start_lfclk(clock::Source::RC, false, false);
+    let mut clock = clock.start_lfclk(clock::Source::Xtal, false, false); // TODO: switch back to xtal
+    // let mut clock = clock.start_lfclk(clock::Source::RC, false, false);
 
     // set up radio
     let mut radio = radio::Radio::new(device.RADIO);
@@ -49,12 +52,6 @@ fn main() -> ! {
     let device_id = ((device.FICR.deviceid[1].read().bits() as u64) << 32)
         + (device.FICR.deviceid[0].read().bits() as u64);
     let part_id = device.FICR.info.part.read().bits();
-
-    // rng test
-    // let rng = rng::Rng::new(device.RNG, &mut core.NVIC);
-    // let rng = rng.start_getting_value();
-    // let (rng, val) = rng.wait_for_value();
-    // rng test
 
     // adc test
     // let mut adc_result = 0u32;
@@ -105,22 +102,22 @@ fn main() -> ! {
     // }
 
     // set up timer
-    let timer = timer::Timer::new(device.TIMER0, &mut core.NVIC);
+    // let mut timer = timer::Timer::new(&mut device.TIMER0, &mut core.NVIC);
 
     // // set up twim
     // let mut p0 = p0::P0::new(device.P0);
-    // // SCL P0.25
+    // // SCL P0.23
     // p0.configure_pin(
-    //     25,
+    //     23,
     //     p0::Dir::Input,
     //     p0::Pull::PullUp,
     //     p0::Drive::S0D1,
     //     p0::Input::Connect,
     //     p0::Sense::Disabled,
     // );
-    // // SDA P0.26
+    // // SDA P0.22
     // p0.configure_pin(
-    //     26,
+    //     22,
     //     p0::Dir::Input,
     //     p0::Pull::PullUp,
     //     p0::Drive::S0D1,
@@ -128,38 +125,44 @@ fn main() -> ! {
     //     p0::Sense::Disabled,
     // );
 
-    let twim = twim::Twim::new(device.TWIM0, &mut core.NVIC, 23, 22, twim::Frequency::K100);
+    // let serial = 0u32;
+    let serial = {
+        let mut timer = timer::Timer::new(&mut device.TIMER0, &mut core.NVIC);
+        let mut twim = twim::Twim::new(
+            &mut device.TWIM0,
+            &mut core.NVIC,
+            &mut device.P0,
+            23,
+            22,
+            twim::Frequency::K400,
+        );
+        let mut sht4x = sht4x::SHT4X::new(&mut twim, &mut timer, 0x44);
+        sht4x.start_reading_serial().unwrap();
+        sht4x.wait_for_serial().unwrap()
+    };
 
-    // let mut sht4x = sht4x::SHT4X::new(twim, timer, 0x44);
-    let mut mmc = mmc5603nj::MMC5603NJ::new(twim, 0b00110000);
-
-    // let mut serial = 0u32;
-    // sht4x = sht4x
-    //     .start_reading_serial()
-    //     .unwrap()
-    //     .wait_for_serial(&mut serial)
-    //     .unwrap();
-
-    let mut rtc = rtc::Rtc::new(device.RTC0, &mut core.NVIC);
+    let mut rtc = rtc::Rtc::new(&mut device.RTC0, &mut core.NVIC);
     rtc.set_prescaler(3276); // 0.1 s
-    rtc.set_compare(30); // 3 s
-                         // rtc.set_compare(600); // 1 min
+    // rtc.set_compare(30); // 3 s
+    rtc.set_compare(600); // 1 min
 
     // initialize index
     let mut index = 0u32;
 
     loop {
         // wait
-        rtc = rtc.start().wait();
+        rtc.start();
+        rtc.wait();
 
         // get battery voltage
         let mut saadc = saadc::Saadc::new(device.SAADC, device.P0);
         let battery_voltage = saadc.getValue();
+        // let battery_voltage = 1f32;
         let tmp = saadc.free();
         device.SAADC = tmp.0;
         device.P0 = tmp.1;
 
-        // reactive start
+        // reactivate start
         // if battery_voltage < 1.1 {
         //     let port0 = hal::gpio::p0::Parts::new(device.P0);
         //     let mut p19 = port0.p0_19.into_push_pull_output(hal::gpio::Level::High);
@@ -171,38 +174,73 @@ fn main() -> ! {
         //         let tmp = 5;
         //     }
         // }
-        // reactive end
+        // reactivate end
 
         // get sensor data
-        let mut temperature = 25f32;
-        let mut humidity = 50f32;
+        // let mut temperature = 25f32;
+        // let mut humidity = 50f32;
 
-        // sht4x = sht4x
-        //     .start_measurement()
-        //     .unwrap()
-        //     .wait_for_measurement(&mut temperature, &mut humidity)
-        //     .unwrap();
+        // sht4x_measurement(&mut twim, &mut timer);
 
-        mmc = mmc.start_measurement().unwrap().wait_for_measurement(&mut temperature).unwrap();
+        // let measurement = Measurement {
+        //     temperature: 25.0,
+        //     humidity: 50.5,
+        // };
+
+        let measurement = {
+            let mut timer = timer::Timer::new(&mut device.TIMER0, &mut core.NVIC);
+            let mut twim = twim::Twim::new(
+                &mut device.TWIM0,
+                &mut core.NVIC,
+                &mut device.P0,
+                23,
+                22,
+                twim::Frequency::K400,
+            );
+            let mut sht4x = sht4x::SHT4X::new(&mut twim, &mut timer, 0x44);
+            sht4x.start_measurement().unwrap();
+            sht4x.wait_for_measurement().unwrap()
+        };
+
+        // let mag = {
+        //     let mut twim = twim::Twim::new(
+        //         &mut device.TWIM0,
+        //         &mut core.NVIC,
+        //         &mut device.P0,
+        //         23,
+        //         22,
+        //         twim::Frequency::K400,
+        //     );
+        //     let mut mmc = mmc5603nj::MMC5603NJ::new(&mut twim, 0b00110000);
+        //     // mmc.start_magnetic__measruement(mmc5603nj::Mmc5603njBias::Set).unwrap();
+        //     // let meas1 = mmc.wait_for_magnetic_measurement().unwrap();
+        //     // mmc.start_magnetic__measruement(mmc5603nj::Mmc5603njBias::Reset).unwrap();
+        //     // let meas2 = mmc.wait_for_magnetic_measurement().unwrap();
+
+        //     // ((meas1.0 - meas2.0) / 2f32, (meas1.1 - meas2.1) / 2f32, (meas1.2 - meas2.2) / 2f32)
+        //     mmc.start_magnetic__measruement(mmc5603nj::Mmc5603njBias::Reset).unwrap();
+        //     mmc.wait_for_magnetic_measurement().unwrap()
+        // };
 
         // create package
-        let mut package: [u8; 46] = [0; 46];
+        let mut package: [u8; 54] = [0; 54];
 
         package[0..2].copy_from_slice(&5u16.to_le_bytes()[..]);
         package[2..10].copy_from_slice(&device_id.to_le_bytes()[..]);
         package[10..14].copy_from_slice(&part_id.to_le_bytes()[..]);
         package[14..18].copy_from_slice(&index.to_le_bytes()[..]);
-        package[18..20].copy_from_slice(&0u16.to_le_bytes()[..]);
-        package[20..22].copy_from_slice(&0i16.to_le_bytes()[..]);
+        package[18..22].copy_from_slice(&0u32.to_le_bytes()[..]);
         package[22..24].copy_from_slice(&0i16.to_le_bytes()[..]);
         package[24..26].copy_from_slice(&0i16.to_le_bytes()[..]);
         package[26..28].copy_from_slice(&0i16.to_le_bytes()[..]);
-        package[28..30].copy_from_slice(&0i16.to_le_bytes()[..]);
-        package[30..32].copy_from_slice(&0i16.to_le_bytes()[..]);
-        package[32..34].copy_from_slice(&0u16.to_le_bytes()[..]);
-        package[34..38].copy_from_slice(&temperature.to_le_bytes()[..]);
-        package[38..42].copy_from_slice(&humidity.to_le_bytes()[..]);
-        package[42..46].copy_from_slice(&battery_voltage.to_le_bytes()[..]);
+        package[28..32].copy_from_slice(&0u32.to_le_bytes()[..]);
+        package[32..34].copy_from_slice(&0i16.to_le_bytes()[..]);
+        package[34..36].copy_from_slice(&0i16.to_le_bytes()[..]);
+        package[36..38].copy_from_slice(&0i16.to_le_bytes()[..]);
+        package[38..42].copy_from_slice(&serial.to_le_bytes()[..]);
+        package[42..46].copy_from_slice(&measurement.temperature.to_le_bytes()[..]);
+        package[46..50].copy_from_slice(&measurement.humidity.to_le_bytes()[..]);
+        package[50..54].copy_from_slice(&battery_voltage.to_le_bytes()[..]);
 
         // increment index
         index += 1;
