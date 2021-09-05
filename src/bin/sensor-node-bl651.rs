@@ -40,6 +40,13 @@ fn main() -> ! {
     let mut device = pac::Peripherals::take().unwrap();
     let mut core = pac::CorePeripherals::take().unwrap();
 
+    // read the configuration
+    let conf0 = device.UICR.customer[0].read().bits();
+    let conf_board_type = (conf0 >> 24) as u8;
+    let conf_version_major = (conf0 >> 16) as u8;
+    let conf_version_minor = (conf0 >> 8) as u8;
+    let conf_version_patch = conf0 as u8;
+
     let clock = clock::Clock::new(device.CLOCK);
     let mut clock = clock.start_lfclk(clock::Source::Xtal, false, false); // TODO: switch back to xtal
     // let mut clock = clock.start_lfclk(clock::Source::RC, false, false);
