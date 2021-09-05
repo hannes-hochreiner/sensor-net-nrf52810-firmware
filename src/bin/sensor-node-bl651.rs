@@ -1,10 +1,7 @@
 #![no_std]
 #![no_main]
 
-use core::mem;
-
 use common::sht4x::Measurement;
-use embedded_hal::adc;
 use hal::prelude::OutputPin;
 // pick a panicking behavior
 use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
@@ -16,14 +13,9 @@ use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch
 // use cortex_m_rt::entry;
 use nrf52810_hal as hal;
 use nrf52810_pac as pac;
-use pac::interrupt;
-// use nrf52810_hal::prelude::_embedded_hal_blocking_delay_DelayMs;
-// use rtic::app;
-// use common::sht3;
 use common::power;
 use common::radio;
 use common::utils::{copy_into_array, get_key};
-// use embedded_hal::blocking::{i2c as i2c, delay as delay};
 use common::clock;
 use common::mmc5603nj;
 use common::p0;
@@ -33,7 +25,6 @@ use common::saadc;
 use common::sht4x;
 use common::timer;
 use common::twim;
-// use embedded_hal::blocking::delay::DelayMs;
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
@@ -48,7 +39,7 @@ fn main() -> ! {
     let conf_version_patch = conf0 as u8;
 
     let clock = clock::Clock::new(device.CLOCK);
-    let mut clock = clock.start_lfclk(clock::Source::Xtal, false, false); // TODO: switch back to xtal
+    let mut clock = clock.start_lfclk(clock::Source::Xtal, false, false);
     // let mut clock = clock.start_lfclk(clock::Source::RC, false, false);
 
     // set up radio
@@ -60,79 +51,7 @@ fn main() -> ! {
         + (device.FICR.deviceid[0].read().bits() as u64);
     let part_id = device.FICR.info.part.read().bits();
 
-    // adc test
-    // let mut adc_result = 0u32;
-    // let adc_result = 0u16;
-    // // select P0.03/AIN1 as the positive input
-    // device.P0.pin_cnf[3].write(|w| w.input().connect());
-    // device.SAADC.ch[0].pselp.write(|w| w.pselp().analog_input1());
-    // // device.SAADC.ch[0].pselp.write(|w| w.pselp().vdd());
-    // // set gain 1
-    // device.SAADC.ch[0].config.write(|w| w.gain().gain1());
-    // // device.SAADC.ch[0].config.write(|w| w.gain().gain1_6());
-    // // set result pointer
-    // device.SAADC.result.ptr.write(|w| unsafe { w.ptr().bits((&adc_result as *const u16) as u32) });
-    // // set max count 1
-    // device.SAADC.result.maxcnt.write(|w| unsafe { w.maxcnt().bits(1) });
-    // // enable
-    // device.SAADC.enable.write(|w| w.enable().enabled());
-
-    // let mut adc_ready = false;
-    // let mut adc_cntr = 0;
-
-    // while !adc_ready {
-    //     adc_ready = device.SAADC.status.read().status().is_ready();
-    //     adc_cntr += 1;
-    // }
-    // adc test
-
-    // loop {
-    //     let mut saadc = saadc::Saadc::new(device.SAADC, device.P0);
-    //     let battery_voltage = saadc.getValue();
-    //     let tmp = saadc.free();
-    //     device.SAADC = tmp.0;
-    //     device.P0 = tmp.1;
-    //     // start ADC
-    //     device.SAADC.tasks_start.write(|w| w.tasks_start().trigger());
-    //     while device.SAADC.events_started.read().events_started().is_not_generated() {}
-
-    //     // trigger sample task
-    //     device.SAADC.tasks_sample.write(|w| w.tasks_sample().trigger());
-    //     while device.SAADC.events_end.read().events_end().is_not_generated() {}
-
-    //     let res = adc_result as f32 * 0.6 / 1024.0 / 0.4;
-    //     // Chevron: 1023 => 1.49853528 2021-03-01 20:26
-    //     // Premio: 848 => 1.2421875 2021-03-01 20:32
-
-    //     device.SAADC.events_started.write(|w| w.events_started().not_generated());
-    //     device.SAADC.events_end.write(|w| w.events_end().not_generated());
-    // }
-
-    // set up timer
-    // let mut timer = timer::Timer::new(&mut device.TIMER0, &mut core.NVIC);
-
-    // // set up twim
-    // let mut p0 = p0::P0::new(device.P0);
-    // // SCL P0.23
-    // p0.configure_pin(
-    //     23,
-    //     p0::Dir::Input,
-    //     p0::Pull::PullUp,
-    //     p0::Drive::S0D1,
-    //     p0::Input::Connect,
-    //     p0::Sense::Disabled,
-    // );
-    // // SDA P0.22
-    // p0.configure_pin(
-    //     22,
-    //     p0::Dir::Input,
-    //     p0::Pull::PullUp,
-    //     p0::Drive::S0D1,
-    //     p0::Input::Connect,
-    //     p0::Sense::Disabled,
-    // );
-
-    // let serial = 0u32;
+    // get sensor id
     let serial = {
         let mut timer = timer::Timer::new(&mut device.TIMER0, &mut core.NVIC);
         let mut twim = twim::Twim::new(
@@ -151,10 +70,11 @@ fn main() -> ! {
     let mut rtc = rtc::Rtc::new(&mut device.RTC0, &mut core.NVIC);
     rtc.set_prescaler(3276); // 0.1 s
 
+    // set delay time based on whether debug or production build is run
     if cfg!(debug_assertions) {
-        rtc.set_compare(30); // 3 s
+        rtc.set_compare(30); // debug interval: 3 s
     } else {
-        rtc.set_compare(600); // 1 min
+        rtc.set_compare(600); // production interval: 1 min
     }
 
     // initialize index
@@ -168,7 +88,6 @@ fn main() -> ! {
         // get battery voltage
         let mut saadc = saadc::Saadc::new(device.SAADC, device.P0);
         let battery_voltage = saadc.getValue();
-        // let battery_voltage = 1f32;
         let tmp = saadc.free();
         device.SAADC = tmp.0;
         device.P0 = tmp.1;
@@ -187,17 +106,6 @@ fn main() -> ! {
                 rtc.wait();
             }
         }
-
-        // get sensor data
-        // let mut temperature = 25f32;
-        // let mut humidity = 50f32;
-
-        // sht4x_measurement(&mut twim, &mut timer);
-
-        // let measurement = Measurement {
-        //     temperature: 25.0,
-        //     humidity: 50.5,
-        // };
 
         let measurement = {
             let mut timer = timer::Timer::new(&mut device.TIMER0, &mut core.NVIC);
