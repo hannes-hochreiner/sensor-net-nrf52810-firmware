@@ -3,12 +3,13 @@ use nrf52810_pac as pac;
 pub struct Saadc {
     saadc: pac::SAADC,
     p0: pac::P0,
+    pin: usize,
 }
 
 impl Saadc {
-    pub fn new(saadc: pac::SAADC, p0: pac::P0) -> Self {
+    pub fn new(saadc: pac::SAADC, p0: pac::P0, pin: usize) -> Self {
         // select P0.03/AIN1 as the positive input
-        p0.pin_cnf[3].write(|w| w.input().connect());
+        p0.pin_cnf[pin].write(|w| w.input().connect());
         saadc.ch[0].pselp.write(|w| w.pselp().analog_input1());
         // set gain 1
         saadc.ch[0].config.write(|w| w.gain().gain1());
@@ -18,8 +19,7 @@ impl Saadc {
         saadc.enable.write(|w| w.enable().enabled());
 
         Saadc {
-            saadc: saadc,
-            p0: p0,
+            saadc, p0, pin,
         }
     }
 
@@ -49,8 +49,6 @@ impl Saadc {
         while self.saadc.events_end.read().events_end().is_not_generated() {}
 
         let res = adc_result as f32 * 0.6 / 1024.0 / 0.4;
-        // Chevron: 1023 => 1.49853528 2021-03-01 20:26
-        // Premio: 848 => 1.2421875 2021-03-01 20:32
 
         self.saadc
             .events_started
@@ -65,8 +63,8 @@ impl Saadc {
     pub fn free(self) -> (pac::SAADC, pac::P0) {
         // disable SAADC
         self.saadc.enable.write(|w| w.enable().disabled());
-        // disconnect P0.03/AIN1
-        self.p0.pin_cnf[3].write(|w| w.input().disconnect());
+        // disconnect pin
+        self.p0.pin_cnf[self.pin].write(|w| w.input().disconnect());
 
         (self.saadc, self.p0)
     }
