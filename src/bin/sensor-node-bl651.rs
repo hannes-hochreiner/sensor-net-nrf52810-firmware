@@ -38,6 +38,13 @@ fn main() -> ! {
     let conf_version_minor = (conf0 >> 8) as u8;
     let conf_version_patch = conf0 as u8;
 
+    if conf_version_major == 1 && conf_version_minor == 1 {
+        // disable snooze mode (pull pin 19 high)
+        device.P0.pin_cnf[19].write(|w| w.dir().output());
+        device.P0.out.write(|w| w.pin19().high());
+        device.P0.outset.write(|w| w.pin19().set());
+    }
+
     let clock = clock::Clock::new(device.CLOCK);
     let mut clock = clock.start_lfclk(clock::Source::Xtal, false, false);
     // let mut clock = clock.start_lfclk(clock::Source::RC, false, false);
@@ -71,11 +78,12 @@ fn main() -> ! {
     rtc.set_prescaler(3276); // 0.1 s
 
     // set delay time based on whether debug or production build is run
-    if cfg!(debug_assertions) {
-        rtc.set_compare(30); // debug interval: 3 s
-    } else {
-        rtc.set_compare(600); // production interval: 1 min
-    }
+    // if cfg!(debug_assertions) {
+    //     rtc.set_compare(30); // debug interval: 3 s
+    // } else {
+    //     rtc.set_compare(600); // production interval: 1 min
+    // }
+    rtc.set_compare(600); // production interval: 1 min
 
     // initialize index
     let mut index = 0u32;
@@ -85,8 +93,13 @@ fn main() -> ! {
         rtc.start();
         rtc.wait();
 
+        if conf_version_major == 1 && conf_version_minor == 1 {
+            // disable snooze mode (pull pin 19 high)
+            device.P0.outset.write(|w| w.pin19().set());
+        }
+    
         // get battery voltage
-        let mut saadc = saadc::Saadc::new(device.SAADC, device.P0);
+        let mut saadc = saadc::Saadc::new(device.SAADC, device.P0, 3);
         let battery_voltage = saadc.getValue();
         let tmp = saadc.free();
         device.SAADC = tmp.0;
@@ -94,18 +107,12 @@ fn main() -> ! {
 
         // if battery voltage is lower 1.1 V and we are not running in debug mode,
         // go into a sleep loop
-        if battery_voltage < 1.1 && !cfg!(debug_assertions) {
-            // let port0 = hal::gpio::p0::Parts::new(device.P0);
-            // let mut p19 = port0.p0_19.into_push_pull_output(hal::gpio::Level::High);
-            // p19.set_high().unwrap();
-            // device.P0.pin_cnf[19].write(|w| w.dir().output());
-            // device.P0.out.write(|w| w.pin19().high());
-            // device.P0.outset.write(|w| w.pin19().set());
-            loop {
-                rtc.start();
-                rtc.wait();
-            }
-        }
+        // if (battery_voltage < 1.1) && !cfg!(debug_assertions) {
+        //     loop {
+        //         rtc.start();
+        //         rtc.wait();
+        //     }
+        // }
 
         let measurement = {
             let mut timer = timer::Timer::new(&mut device.TIMER0, &mut core.NVIC);
@@ -180,5 +187,10 @@ fn main() -> ! {
         radio.set_enabled(false);
 
         clock = clock_hf_active.stop_hfclk();
+
+        if conf_version_major == 1 && conf_version_minor == 1 {
+            // enable snooze mode (pull pin 19 low)
+            device.P0.outclr.write(|w| w.pin19().clear());
+        }
     }
 }
