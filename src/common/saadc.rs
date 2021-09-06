@@ -18,9 +18,7 @@ impl Saadc {
         // enable
         saadc.enable.write(|w| w.enable().enabled());
 
-        Saadc {
-            saadc, p0, pin,
-        }
+        Saadc { saadc, p0, pin }
     }
 
     pub fn getValue(&mut self) -> f32 {

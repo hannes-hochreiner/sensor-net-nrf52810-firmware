@@ -11,20 +11,20 @@ use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch
 
 // use cortex_m::asm;
 // use cortex_m_rt::entry;
-use nrf52810_hal as hal;
-use nrf52810_pac as pac;
-use common::power;
-use common::radio;
-use common::utils::{copy_into_array, get_key};
 use common::clock;
 use common::mmc5603nj;
 use common::p0;
+use common::power;
+use common::radio;
 use common::rng;
 use common::rtc;
 use common::saadc;
 use common::sht4x;
 use common::timer;
 use common::twim;
+use common::utils::{copy_into_array, get_key};
+use nrf52810_hal as hal;
+use nrf52810_pac as pac;
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
@@ -97,7 +97,7 @@ fn main() -> ! {
             // disable snooze mode (pull pin 19 high)
             device.P0.outset.write(|w| w.pin19().set());
         }
-    
+
         // get battery voltage
         let mut saadc = saadc::Saadc::new(device.SAADC, device.P0, 3);
         let battery_voltage = saadc.getValue();

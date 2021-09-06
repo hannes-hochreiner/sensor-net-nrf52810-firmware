@@ -10,7 +10,7 @@ pub enum Mmc5603njError {
 pub enum Mmc5603njBias {
     Set,
     Reset,
-    None
+    None,
 }
 
 pub struct MMC5603NJ<'a> {
@@ -28,18 +28,21 @@ impl<'a> MMC5603NJ<'a> {
         }
     }
 
-    pub fn start_magnetic__measruement(&mut self, bias: Mmc5603njBias) -> Result<(), Mmc5603njError> {
+    pub fn start_magnetic__measruement(
+        &mut self,
+        bias: Mmc5603njBias,
+    ) -> Result<(), Mmc5603njError> {
         match bias {
             Mmc5603njBias::Set => {
                 let buffer = [0x1B, 0x08];
                 self.twim.start_write(self.address, &buffer);
                 self.twim.wait().unwrap();
-            },
+            }
             Mmc5603njBias::Reset => {
                 let buffer = [0x1B, 0x10];
                 self.twim.start_write(self.address, &buffer);
                 self.twim.wait().unwrap();
-            },
+            }
             _ => {}
         }
 

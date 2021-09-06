@@ -41,7 +41,7 @@ impl<'a> SHT4X<'a> {
 
         // TODO: check that timer is not running already
         self.timer.set_timeout_mus(1_000);
-        self.timer.start(); 
+        self.timer.start();
 
         Ok(())
     }

@@ -20,18 +20,18 @@ use panic_halt as _;
 //
 // The expected output is (for a value of 0x01010100 corresponding to board type 01, version 1.1.0):
 //
-// 
+//
 // target/thumbv7em-none-eabi/debug/nrf52810-conf:     file format elf32-little
 //
 // Contents of section .conf:
-//  10001080 00010101                             ....            
+//  10001080 00010101                             ....
 // Contents of section .vector_table:
 //  0000 00600020 b9000000 eb020000 b9070000  .`. ............
 //  0010 eb020000 eb020000 eb020000 00000000  ................
 //
 // The program will read the newly written value.
 // Using the command "p/x _val" in the debug console, will display the value in hex.
-// 
+//
 #[used]
 #[link_section = ".conf"]
 static UICR_ADDR_0X80: u32 = 0x01010100;
